@@ -6,3 +6,5 @@ densenet161_emotion_9class.pth
 *.zip
 *.pkl
 *.pt
+Datasets
+runs
