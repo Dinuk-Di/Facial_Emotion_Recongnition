@@ -6,6 +6,7 @@ densenet161_emotion_9class.pth
 *.zip
 *.pkl
 *.pt
+*.h5
 Datasets
 runs
 
