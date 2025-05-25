@@ -1,0 +1,15 @@
+names:
+- angry
+- boring
+- disgust
+- fear
+- happy
+- neutral
+- sad
+- stress
+- suprised
+nc: 9
+path: /mnt/d/Group50/Facial_Emotion_Recongnition/Datasets/Preprpcess_Large_Dataset
+test: /mnt/d/Group50/Facial_Emotion_Recongnition/Datasets/Preprpcess_Large_Dataset/test
+train: /mnt/d/Group50/Facial_Emotion_Recongnition/Datasets/Preprpcess_Large_Dataset/train
+val: /mnt/d/Group50/Facial_Emotion_Recongnition/Datasets/Preprpcess_Large_Dataset/val
