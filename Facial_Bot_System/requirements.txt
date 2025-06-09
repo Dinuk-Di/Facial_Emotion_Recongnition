@@ -1,0 +1,9 @@
+pyqt5
+opencv-python
+ultralytics
+mss
+pillow
+langgraph
+ollama
+pywin32
+pystray
