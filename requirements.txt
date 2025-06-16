@@ -1,0 +1,11 @@
+langchain
+langchainhub
+llama-cpp-python
+crewai
+openai
+psutil
+opencv-python
+numpy
+tensorflow
+keras
+
