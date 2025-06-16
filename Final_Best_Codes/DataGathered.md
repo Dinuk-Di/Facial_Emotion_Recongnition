@@ -36,3 +36,9 @@ Meaning: Lower is better. Indicates how well the model is predicting the locatio
 dfl_loss (Distribution Focal Loss)
 Definition: A specialized loss for bounding box regression using a discrete probability distribution over locations.
 Meaning: Helps the model more accurately estimate bounding box borders with high precision.
+
+
+
+
+# ViT
+EfficientViT-L1	224x224	84.484	96.862	53M	5.3G	6207 image/s
