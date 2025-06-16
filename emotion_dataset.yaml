@@ -9,7 +9,7 @@ names:
 - stress
 - suprised
 nc: 9
-path: /mnt/d/Group50/Facial_Emotion_Recongnition/Datasets/Preprpcess_Large_Dataset
-test: /mnt/d/Group50/Facial_Emotion_Recongnition/Datasets/Preprpcess_Large_Dataset/test
-train: /mnt/d/Group50/Facial_Emotion_Recongnition/Datasets/Preprpcess_Large_Dataset/train
-val: /mnt/d/Group50/Facial_Emotion_Recongnition/Datasets/Preprpcess_Large_Dataset/val
+path: d:\RuhunaNew\Academic\Research\Facial_Recog\Group_50\Datasets\Preprpcess_Large_Dataset
+test: d:\RuhunaNew\Academic\Research\Facial_Recog\Group_50\Datasets\Preprpcess_Large_Dataset\test
+train: d:\RuhunaNew\Academic\Research\Facial_Recog\Group_50\Datasets\Preprpcess_Large_Dataset\train
+val: d:\RuhunaNew\Academic\Research\Facial_Recog\Group_50\Datasets\Preprpcess_Large_Dataset\val
