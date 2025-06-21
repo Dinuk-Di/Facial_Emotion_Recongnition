@@ -16,6 +16,7 @@ def create_workflow():
     workflow.set_entry_point("calculate_emotion")
     workflow.add_edge("calculate_emotion", "detect_task")
     workflow.add_edge("detect_task", "generate_recommendation")
+    # workflow.add_edge("calculate_emotion", "generate_recommendation")
     workflow.add_edge("generate_recommendation", "execute_action")
     workflow.add_edge("execute_action", END)
     return workflow.compile()
@@ -29,6 +30,7 @@ def process_agent_system(emotions):
         average_emotion=None,
         detected_task=None,
         recommendation=None,
+        recommendation_options=[],
         executed=False
     )
     return agent_workflow.invoke(initial_state)

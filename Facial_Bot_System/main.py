@@ -15,12 +15,12 @@ def create_tray_icon():
     tray.setVisible(True)
 
     # UI window for status
-    status_ui = AgentStatusUI()
-    status_ui.show()
+    # status_ui = AgentStatusUI()
+    # status_ui.show()
 
     # Detection logic
     detector = FaceEmotionDetector()
-    detector.status_ui = status_ui 
+    # detector.status_ui = status_ui 
 
     # Thread
     detection_thread = threading.Thread(target=detector.run, daemon=True)
