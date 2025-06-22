@@ -1,11 +1,12 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow
 from PySide6.QtCore import Qt
-from Interface import Ui_MainWindow  # Your auto-generated class
+from window_interface import Ui_MainWindow  # Your auto-generated class
 
 class MainWindow(QMainWindow):
     def __init__(self, choices):
         super().__init__()
+        self.selectedChoice = None
         self.setWindowFlag(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.ui = Ui_MainWindow()
@@ -14,12 +15,16 @@ class MainWindow(QMainWindow):
         self.move(990, 580)
 
         for idx, choice in enumerate(choices):
-            self.add_choice_main(choice['text'], "res/youtube_resize.png", on_click_choice)
+            self.add_choice_main(choice['text'], "res/youtube_resize.png", self.on_clicked_choice)
 
         self.ui.Close_Btn.clicked.connect(self.close)
 
     def add_choice_main(self, text, icon_path= None, on_click = None):
         self.ui.add_choice(text, icon_path, on_click)
+
+    def on_clicked_choice(self, content):
+        self.selectedChoice = content
+        self.close()
 
 def launch_window(options):
     """Function to create and return the window instance"""
