@@ -63,9 +63,9 @@ class ClickableFrame(QFrame):
         """)
         super().mouseReleaseEvent(event)
 
-class Ui_MainWindow(object):
+class InteraceMainwindow(object):
 
-    def add_choice(self, text="New Choice", icon_path=None, on_click=None):
+    def add_choice(self, text="New Choice", id=None, icon_path=None, on_click=None):
         """Improved version with proper parameter usage"""
         choice_frame = ClickableFrame()
         choice_frame.setObjectName(text.replace(" ", "_"))  # Sanitize object name
@@ -113,7 +113,7 @@ class Ui_MainWindow(object):
 
         # Connect click signal if provided
         if callable(on_click):
-            choice_frame.clicked.connect(lambda: on_click(text))
+            choice_frame.clicked.connect(lambda: on_click(text,id))
 
         self.verticalLayout.addWidget(choice_frame)
 
@@ -143,7 +143,7 @@ class Ui_MainWindow(object):
 
         #Icon {
             background-color: rgb(176, 176, 0);
-            border-image: url(res/Icon.jpg);
+            border-image: url(utils/res/Icon.jpg);
             border-radius: 15px;
         }
                                  
@@ -233,3 +233,5 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
+
+    pass

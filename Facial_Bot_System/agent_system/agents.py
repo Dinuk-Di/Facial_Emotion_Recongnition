@@ -80,6 +80,7 @@ from utils.desktop import capture_desktop
 from utils.notifications import send_notification, execute_task
 from utils.selection_window import selection_window
 from tools.recommender_tools import open_recommendation
+from utils.runner_interface import launch_window
 
 import ollama
 import ctypes
@@ -150,7 +151,7 @@ def task_detection_agent(state):
     #     )
         # print("Response from Llava:", response)
         # print(f"Detected task: {response['response'].strip()}")
-        detected_task = r"F:\Academic\7th semester\FYP\recommondation_agents_implementation\Facial_Bot_System\Screenshot (600).png"
+        detected_task = "Coding in VS code"
         return {"detected_task": detected_task}
     except Exception as e:
         print(f"Error detecting task: {str(e)}")
@@ -200,7 +201,7 @@ def recommendation_agent(state):
     if emotion in negative_emotions:
         print(f"[Agent]{emotion}")  
 
-    print("Recommendation is done 0.")  
+    print("Prompt creation...")
 
     prompt = f"""
         User is feeling {emotion} and is currently working on the screen task: {detected_task}.
@@ -211,22 +212,16 @@ def recommendation_agent(state):
         ["Play music", "Watch funny videos", "Take a break", "Quick game", "Coding Bot", "Nothing"]
         - 'recommendation_options': list of 3 apps to help. Each with app_name, app_url, search_query.
         
-        Then the second output which is the recommendation_options are three out of
-        - Telegram Desktop
-        - Discord 
-        - zoom 
+        Then the second output which is the recommendation_options are three out of Telegram Desktop, Discord, zoom 
         or apps that can be run through a webrowser. For an example, facebook, whatsapp, inster, youtube, etc. The response formate should be as below.
         Example response:
         recommendation: Play music
         recommendation_options: [
-        (app_name: 'YouTube', app_url: 'https://youtube.com', search_query: 'chill lofi music'),
-        (app_name: 'Spotify', app_url: 'https://open.spotify.com', search_query: 'relax playlist'),
-        (app_name: 'Discord', app_url: 'discord://', search_query: '')
+        (app_name: 'YouTube', text: 'Watch videos on chill lofi music', app_url: 'https://youtube.com', search_query: 'chill lofi music'),
+        (app_name: 'Spotify', text: 'Listen to music on relax playlist', app_url: 'https://open.spotify.com', search_query: 'relax playlist')
         ]
         Respond ONLY with the exact phrase from the list.
         """
-
-    print("Recommendation is done 1.")
 
     response = ollama.generate(
         model="qwen3:4b",
@@ -234,7 +229,7 @@ def recommendation_agent(state):
         options={"temperature": 0.2}
     )
     response_text = response["response"]
-    print("Recommendation is done 2.")
+    print("Recommendation is done.")
     print("[Agent] Raw LLM Response:", response_text)
     
     try:
@@ -266,7 +261,12 @@ def task_execution_agent(state):
     if "No action needed" not in recommended_output:
         status = send_notification(recommended_output)
         if status:
-            selected_option = selection_window(recommended_options)
+            #selected_option = selection_window(recommended_options)
+
+            window, app = launch_window(recommended_options)
+            app.exec()
+            selected_option = window.selectedChoice
+
             print("selected option: ", selected_option)
             if selected_option:
                 open_recommendation(selected_option) # Execute the task based on the option
