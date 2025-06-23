@@ -8,3 +8,5 @@ class AgentState(BaseModel):
     recommendation: Optional[str]
     recommendation_options: Optional[List[Dict[str, str]]]
     executed: Optional[bool]
+    action_executed: Optional[str]
+    action_time_start: Optional[float]

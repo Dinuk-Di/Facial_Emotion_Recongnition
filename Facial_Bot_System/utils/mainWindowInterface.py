@@ -187,7 +187,7 @@ class InteraceMainwindow(object):
         self.Close_Btn.setGeometry(QRect(10, 30, 31, 21))
         self.Close_Btn.setAutoFillBackground(False)
         icon = QIcon()
-        icon.addFile(u"res/close.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon.addFile(u"utils/res/close.png", QSize(), QIcon.Normal, QIcon.Off)
         self.Close_Btn.setIcon(icon)
         self.Close_Btn.raise_()
 

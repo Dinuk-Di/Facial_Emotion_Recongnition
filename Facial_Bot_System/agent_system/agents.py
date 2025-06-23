@@ -76,12 +76,13 @@ import base64
 from collections import Counter
 import re
 import json
+import time
 from utils.desktop import capture_desktop
 from utils.notifications import send_notification, execute_task
 from utils.selection_window import selection_window
 from tools.recommender_tools import open_recommendation
 from utils.runner_interface import launch_window
-
+import requests
 import ollama
 import ctypes
 from collections import Counter
@@ -126,33 +127,56 @@ def parse_llm_response(text):
 
 def task_detection_agent(state):
     try:
-    #     if state.average_emotion == "neutral":
-    #         print("[Agent] No task detection needed for neutral emotion.")
-    #         return {"detected_task": "No Need to Detect Task"}
-    #     # Capture screenshot as a base64 string (possibly with prefix)
-    #     screenshot = capture_desktop()
-    #     if not screenshot:
-    #         raise ValueError("Failed to capture screenshot")
-    #     # Remove data URI prefix if present
-    #     if screenshot.startswith('data:image'):
-    #         screenshot = screenshot.split(',')[1]
+        if state.average_emotion == "neutral":
+            print("[Agent] No task detection needed for neutral emotion.")
+            return {"detected_task": "No Need to Detect Task"}
+        # Capture screenshot as a base64 string (possibly with prefix)
+        screenshot = capture_desktop()
+        if not screenshot:
+            raise ValueError("Failed to capture screenshot")
+        # Remove data URI prefix if present
+        if screenshot.startswith('data:image'):
+            screenshot = screenshot.split(',')[1]
 
-    #     # Validate base64 string (optional, for debugging)
-    #     try:
-    #         base64.b64decode(screenshot)
-    #     except Exception as decode_err:
-    #         raise ValueError(f"Invalid base64 screenshot: {decode_err}")
+        # Validate base64 string (optional, for debugging)
+        try:
+            base64.b64decode(screenshot)
+        except Exception as decode_err:
+            raise ValueError(f"Invalid base64 screenshot: {decode_err}")
 
-    #     # Send the raw base64 string (no prefix) to Ollama
-    #     response = ollama.generate(
-    #         model="llava:7b",
-    #         prompt="Describe user's current activity. Focus on software and tasks.",
-    #         images=[screenshot]
-    #     )
-        # print("Response from Llava:", response)
-        # print(f"Detected task: {response['response'].strip()}")
-        detected_task = "Coding in VS code"
+        # Send the raw base64 string (no prefix) to Ollama
+        # response = ollama.generate(
+        #     model="llava:7b",
+        #     prompt="Describe user's current activity. Focus on software and tasks.",
+        #     images=[screenshot]
+        # )
+        headers = {
+            "Connection": "close",  # Disable keep-alive
+            "Content-Type": "application/json"
+        }
+        response = requests.post(
+            "https://5a1b-192-248-50-253.ngrok-free.app/api/generate",
+            headers=headers,
+            json={
+                "model": "llava:7b",
+                "prompt": "Describe user's current activity. Focus on software and tasks.",
+                "images": [screenshot],
+                "stream": False
+            }
+        )
+
+        # Handle HTTP errors
+        if response.status_code != 200:
+            print(f"API error ({response.status_code}): {response.text[:100]}...")
+            return {"detected_task": "unknown"}
+
+        # Parse JSON response
+        response_data = response.json()
+        detected_task = response_data.get('response', '').strip()
+        state.detected_task = detected_task
+        print(f"Detected task: {detected_task}")
         return {"detected_task": detected_task}
+
     except Exception as e:
         print(f"Error detecting task: {str(e)}")
         return {"detected_task": "unknown"}
@@ -266,15 +290,46 @@ def task_execution_agent(state):
             window, app = launch_window(recommended_options)
             app.exec()
             selected_option = window.selectedChoice
+            window.close()
 
             print("selected option: ", selected_option)
             if selected_option:
+                start_time = time.time()
                 open_recommendation(selected_option) # Execute the task based on the option
+                return {
+                    "executed": True,
+                    "action_time_start": start_time
+                }
                     
     # send_blocking_message(
     #     title="Emotion Assistant",
     #     message=f"You seem {state.average_emotion}. Recommendation: {recommended_output}"
     # )
    
+def task_exit_agent(state):
+    executed_state = state.executed
+    start_time = state.action_time_start
+
+    delay_time = 0.3 # delay before closing
+    closing_text = "Time to get back to work"
+
+    while executed_state:
+        elapsed = time.time() - start_time
+        if elapsed >= delay_time * 60:
+            status = send_notification(closing_text)
+            
+            if status:
+                print("Closing action....")
+                break
+            else:
+                start_time = time.time()
+                delay_time = 0.1
+        time.sleep(1)
+
+    return {
+        "executed": False,
+        "action_time_start": None
+    }
+
 
 
