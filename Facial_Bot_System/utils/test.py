@@ -35,6 +35,12 @@ if __name__ == "__main__":
     #     print(f"option: {choice}, choice_id: {idx}, choice_icon: {icon}\n")
 
     window, app = launch_window(options=options)
+
+    choice = int(input("Enter your choice (1-4): "))
+
+    #if choice == "Show":
+    #    window
+
     app.exec()
     
     print("Final Selected Choice:", window.selectedChoice)

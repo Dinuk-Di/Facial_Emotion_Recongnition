@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from PySide6.QtCore import QCoreApplication, QMetaObject, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QCoreApplication, QMetaObject, QRect, QSize, Qt, Signal, QPropertyAnimation
 from PySide6.QtGui import QFont, QIcon
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget, QPushButton)
+from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget, QPushButton, QGroupBox)
 
 class ClickableFrame(QFrame):
     clicked = Signal()
@@ -149,7 +149,7 @@ class InteraceMainwindow(object):
 
         #Icon {
             background-color: rgba(87, 117, 201, 0.392);
-            border-image: url(utils/res/Icon.jpg);
+            border-image: url(res/Icon.jpg);
             border-radius: 15px;
         }
                                  
@@ -171,8 +171,12 @@ class InteraceMainwindow(object):
         self.MainFrame.setFrameShape(QFrame.StyledPanel)
         self.MainFrame.setFrameShadow(QFrame.Raised)
 
+        # ===== Hide element =====
+        self.recommend_group = QGroupBox(self.MainFrame)
+        self.recommend_group.setObjectName(u"Recommend_Group")
+
         # ===== Exit button =====
-        self.Close_Btn = QPushButton(self.MainFrame)
+        self.Close_Btn = QPushButton(self.recommend_group)
         self.Close_Btn.setObjectName(u"Close_Btn")
 
         self.Close_Btn.setStyleSheet("""
@@ -193,7 +197,7 @@ class InteraceMainwindow(object):
         self.Close_Btn.setGeometry(QRect(10, 30, 31, 21))
         self.Close_Btn.setAutoFillBackground(False)
         icon = QIcon()
-        icon.addFile(u"utils/res/close.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon.addFile(u"res/close.png", QSize(), QIcon.Normal, QIcon.Off)
         self.Close_Btn.setIcon(icon)
         self.Close_Btn.raise_()
 
@@ -207,7 +211,7 @@ class InteraceMainwindow(object):
         self.Icon.setFrameShadow(QFrame.Raised)
 
         # ===== Choice Frame =====
-        self.ChoiceFrame = QFrame(self.MainFrame)
+        self.ChoiceFrame = QFrame(self.recommend_group)
         self.ChoiceFrame.setObjectName(u"ChoiceFrame")
         self.ChoiceFrame.setGeometry(QRect(10, 49, 421, 162))
         self.ChoiceFrame.setMinimumSize(QSize(421, 161))
@@ -233,6 +237,7 @@ class InteraceMainwindow(object):
         self.ChoiceFrame.raise_()
         self.Icon.raise_()
 
+        self.recommend_group.setVisible(False)
         MainWindow.setCentralWidget(self.centralwidget)
         self.retranslateUi(MainWindow)
         QMetaObject.connectSlotsByName(MainWindow)
@@ -240,4 +245,5 @@ class InteraceMainwindow(object):
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
 
-    pass
+    def updateLayoutShow(self, Recommend_Group):
+        self.recommend_group.setVisible(True)

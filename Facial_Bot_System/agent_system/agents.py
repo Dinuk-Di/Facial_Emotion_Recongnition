@@ -181,7 +181,6 @@ def task_detection_agent(state):
         print(f"Error detecting task: {str(e)}")
         return {"detected_task": "unknown"}
 
-
     # prompt = f"""
     # User is feeling {emotion} and is currently working on the screen task: {detected_task}.
     # User is looking for a way to improve mood.

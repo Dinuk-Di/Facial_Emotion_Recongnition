@@ -1,19 +1,19 @@
 import sys
 
-from utils.mainWindowInterface import InteraceMainwindow
+from mainWindowInterface import InteraceMainwindow
 from PySide6.QtWidgets import QApplication, QMainWindow
 from PySide6.QtCore import Qt
 
 Icons_paths = [
-        {"app_name": "YouTube","icon_path": "utils/res/youtube_resize.png"},
-        {"app_name": "Spotify","icon_path": "utils/res/Spotify.png"},
-        {"app_name": "Discord","icon_path": "utils/res/Discord.png"},
-        {"app_name": "Default","icon_path": "utils/res/default_app.png"},
+        {"app_name": "YouTube","icon_path": "res/youtube_resize.png"},
+        {"app_name": "Spotify","icon_path": "res/Spotify.png"},
+        {"app_name": "Discord","icon_path": "res/Discord.png"},
+        {"app_name": "Default","icon_path": "res/default_app.png"},
     ]
 
 def setup_Icons(app_name, icon_paths):
 
-    default_icon = "utils/res/default_app.png"
+    default_icon = "res/default_app.png"
     icon_path = default_icon
     
     for idx, icon in enumerate(icon_paths):
@@ -45,11 +45,12 @@ class MainWindow(QMainWindow):
         self.ui.add_choice(text, id, icon_path, on_click)
 
     def on_clicked_choice(self, content, id):
-
         selected = self.allchoices[id]
         self.selectedChoice = selected
         print(f"Selected: {id},{content}")
         self.close()
+
+    #def show_recommendations(self, show):
 
 def launch_window(options):
     """Function to create and return the window instance"""
