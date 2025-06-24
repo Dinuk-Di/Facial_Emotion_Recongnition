@@ -9,9 +9,9 @@ class ClickableFrame(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.normal_color = "rgba(85, 255, 255, 128)"
-        self.hover_color = "rgba(100, 255, 255, 180)"  # Slightly brighter/lighter
-        self.pressed_color = "rgba(70, 220, 220, 200)"  # Darker when pressed
+        self.normal_color = "rgba(239, 224, 225, 128)"
+        self.hover_color = "rgba(239, 207, 207, 200)"  # Slightly brighter/lighter
+        self.pressed_color = "rgba(239, 207, 207, 255)"  # Darker when pressed
         
         self.setStyleSheet(f"""
             ClickableFrame {{
@@ -79,6 +79,12 @@ class InteraceMainwindow(object):
             border-radius: 15px;
             border: 2px solid rgb(0, 255, 255);
         }}
+        #{choice_frame.objectName()}:hover {{
+            background-color: rgba(85, 255, 255, 200); /* Lighter on hover */
+        }}
+        #{choice_frame.objectName()}:pressed {{
+            background-color: rgba(85, 255, 255, 255); /* Darker when pressed */
+        }}
         """)
         
         layout = QHBoxLayout(choice_frame)
@@ -137,12 +143,12 @@ class InteraceMainwindow(object):
         }                
 
         #ChoiceFrame {
-            background-color: rgba(72, 170, 173, 255);
+            background-color: rgba(239, 207, 207, 100);
             border-radius: 15px;
         }
 
         #Icon {
-            background-color: rgb(176, 176, 0);
+            background-color: rgba(87, 117, 201, 0.392);
             border-image: url(utils/res/Icon.jpg);
             border-radius: 15px;
         }

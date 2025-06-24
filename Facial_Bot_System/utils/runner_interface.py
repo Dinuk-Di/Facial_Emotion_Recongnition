@@ -13,7 +13,7 @@ Icons_paths = [
 
 def setup_Icons(app_name, icon_paths):
 
-    default_icon = "res/default_app.png"
+    default_icon = "utils/res/default_app.png"
     icon_path = default_icon
     
     for idx, icon in enumerate(icon_paths):

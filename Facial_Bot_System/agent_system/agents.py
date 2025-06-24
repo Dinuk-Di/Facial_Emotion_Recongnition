@@ -208,9 +208,14 @@ def task_detection_agent(state):
     # return {"recommendation": recommendation}
     
 def recommendation_agent(state):
+
+    if "No Need to Detect Task" in state.detected_task or not state.detected_task:
+        print("[Agent] No task detected, skipping recommendation.")
+        return {"recommendation": "No action needed"}
+    
     emotion = state.average_emotion.lower()
     detected_task = state.detected_task
-    print(f"{detected_task}")
+    print(f"[Agent] Calculating recommendation for emotion: {emotion} and task: {detected_task}")
 
     negative_emotions = ["angry", "sad", "fear", "disgust", "stress","boring"]
 
@@ -237,7 +242,7 @@ def recommendation_agent(state):
         - 'recommendation_options': list of 3 apps to help. Each with app_name, app_url, search_query.
         
         Then the second output which is the recommendation_options are three out of Telegram Desktop, Discord, zoom 
-        or apps that can be run through a webrowser. For an example, facebook, whatsapp, inster, youtube, etc. The response formate should be as below.
+        or apps that can be run through a webrowser. For an example, Microsoft Solitaire Collection, facebook, whatsapp, inster, youtube, etc. The response formate should be as below.
         Example response:
         recommendation: Play music
         recommendation_options: [
@@ -247,31 +252,79 @@ def recommendation_agent(state):
         Respond ONLY with the exact phrase from the list.
         """
 
-    response = ollama.generate(
-        model="qwen3:4b",
-        prompt=prompt,
-        options={"temperature": 0.2}
-    )
-    response_text = response["response"]
-    print("Recommendation is done.")
-    print("[Agent] Raw LLM Response:", response_text)
+    # response = ollama.generate(
+    #     model="qwen3:4b",
+    #     prompt=prompt,
+    #     options={"temperature": 0.2}
+    # )
+    # response_text = response["response"]
+    # print("Recommendation is done.")
+    # print("[Agent] Raw LLM Response:", response_text)
     
+    # try:
+    #     recommendation, recommendation_options = parse_llm_response(response_text)
+    # except Exception as e:
+    #     print("[Agent] Error parsing response:", e)
+    #     recommendation = "No action needed"
+    #     recommendation_options = []
+
+    # if not recommendation or not recommendation_options:
+    #     recommendation = "No action needed"
+    #     recommendation_options = []
+
+    # print(f"[Agent] Recommendation: {recommendation}, recommendation_options: {recommendation_options}")
+    # return {
+    #     "recommendation": recommendation,
+    #     "recommendation_options": recommendation_options
+    # }
+
     try:
-        recommendation, recommendation_options = parse_llm_response(response_text)
+        response = requests.post(
+            "https://5a1b-192-248-50-253.ngrok-free.app/api/generate",  # Use local endpoint
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": "qwen3:4b",
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.2},
+                
+            }
+        )
+        
+        # Handle HTTP errors
+        if response.status_code != 200:
+            print(f"API error ({response.status_code}): {response.text[:100]}...")
+            return {"recommendation": "No action needed"}
+            
+        response_data = response.json()
+        print("Response from Ollama:", response_data)
+        # Clean response from <think> tags if present
+        recommendation, recommendation_options = parse_llm_response(response_data.get('response', ''))
+        
+        # Validate response format
+        valid_recommendation = [
+            "Play music", "Watch funny videos", "Take a break", 
+            "Quick game", "Coding Bot", "Nothing"
+        ]
+        
+        if recommendation not in valid_recommendation:
+            print(f"[Warning] Invalid recommendation: {recommendation}")
+            recommendation = "No action needed"
+        
+        # Store in state
+        state.recommendation = recommendation
+        state.recommendation_options = recommendation_options
+        print(f"Recommendation: {recommendation}")
+        print(f"Recommendation options: {recommendation_options}")
+        return {
+            "recommendation": recommendation,
+            "recommendation_options": recommendation_options
+        }
+        
     except Exception as e:
         print("[Agent] Error parsing response:", e)
         recommendation = "No action needed"
         recommendation_options = []
-
-    if not recommendation or not recommendation_options:
-        recommendation = "No action needed"
-        recommendation_options = []
-
-    print(f"[Agent] Recommendation: {recommendation}, recommendation_options: {recommendation_options}")
-    return {
-        "recommendation": recommendation,
-        "recommendation_options": recommendation_options
-    }
 
 
 def send_blocking_message(title, message):
@@ -310,7 +363,7 @@ def task_exit_agent(state):
     executed_state = state.executed
     start_time = state.action_time_start
 
-    delay_time = 0.3 # delay before closing
+    delay_time = 1 # delay before closing
     closing_text = "Time to get back to work"
 
     while executed_state:
