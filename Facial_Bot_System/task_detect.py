@@ -1,5 +1,6 @@
 import base64
 import ollama
+import requests
 from utils.desktop import capture_desktop
 
 def task_detection_agent():
@@ -20,18 +21,40 @@ def task_detection_agent():
             raise ValueError(f"Invalid base64 screenshot: {decode_err}")
 
         # Send the raw base64 string (no prefix) to Ollama
-        response = ollama.generate(
-            model="llava:7b",
-            prompt="Describe user's current activity. Focus on software and tasks.",
-            images=[screenshot]
+        # response = ollama.generate(
+        #     model="llava:7b",
+        #     prompt="Describe user's current activity. Focus on software and tasks.",
+        #     images=[screenshot]
+        # )
+        headers = {
+            "Connection": "close",  # Disable keep-alive
+            "Content-Type": "application/json"
+        }
+        response = requests.post(
+            "https://5a1b-192-248-50-253.ngrok-free.app/api/generate",
+            headers=headers,
+            json={
+                "model": "llava:7b",
+                "prompt": "Describe user's current activity. Focus on software and tasks.",
+                "images": [screenshot],
+                "stream": False
+            }
         )
-        print("Response from Ollama:", response)
-        print(f"Detected task: {response['response'].strip()}")
-        return {"detected_task": response["response"].strip()}
+
+        # Handle HTTP errors
+        if response.status_code != 200:
+            print(f"API error ({response.status_code}): {response.text[:100]}...")
+            return {"detected_task": "unknown"}
+
+        # Parse JSON response
+        response_data = response.json()
+        detected_task = response_data.get('response', '').strip()
+        print(f"Detected task: {detected_task}")
+        return {"detected_task": detected_task}
 
     except Exception as e:
         print(f"Error detecting task: {str(e)}")
         return {"detected_task": "unknown"}
-
+    
 if __name__ == "__main__":
     task_detection_agent()

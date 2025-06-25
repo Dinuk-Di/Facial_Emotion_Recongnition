@@ -5,6 +5,7 @@ import threading
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt5.QtGui import QIcon
 from face_detection import FaceEmotionDetector
+# from drowsiness_detector import DrowsinessDetector
 from ui.status_ui import AgentStatusUI
 
 def create_tray_icon():
@@ -20,11 +21,14 @@ def create_tray_icon():
 
     # Detection logic
     detector = FaceEmotionDetector()
+    # drowsiness_detector = DrowsinessDetector()
     detector.status_ui = status_ui 
 
     # Thread
     detection_thread = threading.Thread(target=detector.run, daemon=True)
+    # drowsiness_thread = threading.Thread(target=drowsiness_detector.run, daemon=True)
     detection_thread.start()
+    # drowsiness_thread.start()
 
     # Menu
     menu = QMenu()

@@ -75,6 +75,8 @@
 import base64
 from collections import Counter
 import re
+
+import requests
 from utils.desktop import capture_desktop
 from utils.notifications import send_notification, execute_task
 import ollama
@@ -115,54 +117,159 @@ def task_detection_agent(state):
             raise ValueError(f"Invalid base64 screenshot: {decode_err}")
 
         # Send the raw base64 string (no prefix) to Ollama
-        response = ollama.generate(
-            model="llava:7b",
-            prompt="Describe user's current activity. Focus on software and tasks.",
-            images=[screenshot]
+        # response = ollama.generate(
+        #     model="llava:7b",
+        #     prompt="Describe user's current activity. Focus on software and tasks.",
+        #     images=[screenshot]
+        # )
+        headers = {
+            "Connection": "close",  # Disable keep-alive
+            "Content-Type": "application/json"
+        }
+        response = requests.post(
+            "https://5a1b-192-248-50-253.ngrok-free.app/api/generate",
+            headers=headers,
+            json={
+                "model": "llava:7b",
+                "prompt": "Describe user's current activity. Focus on software and tasks.",
+                "images": [screenshot],
+                "stream": False
+            }
         )
-        print("Response from Llava:", response)
-        print(f"Detected task: {response['response'].strip()}")
-        return {"detected_task": response["response"].strip()}
+
+        # Handle HTTP errors
+        if response.status_code != 200:
+            print(f"API error ({response.status_code}): {response.text[:100]}...")
+            return {"detected_task": "unknown"}
+
+        # Parse JSON response
+        response_data = response.json()
+        detected_task = response_data.get('response', '').strip()
+        state.detected_task = detected_task
+        print(f"Detected task: {detected_task}")
+        return {"detected_task": detected_task}
 
     except Exception as e:
         print(f"Error detecting task: {str(e)}")
         return {"detected_task": "unknown"}
     
+# def recommendation_agent(state):
+#     if "No Need to Detect Task" in state.detected_task or not state.detected_task:
+#         print("[Agent] No task detected, skipping recommendation.")
+#         return {"recommendation": "No action needed"}
+#     emotion = state.average_emotion.lower()
+#     detected_task = state.detected_task.lower() if state.detected_task else "unknown"
+#     print(f"[Agent] Calculating recommendation for emotion: {emotion} and task: {detected_task}")
+#     negative_emotions = ["angry", "sad", "fear", "disgust", "stress","boring"]
+
+#     if emotion not in negative_emotions:
+#         return {"recommendation": "No action needed"}
+
+#     prompt = f"""
+#     User is feeling {emotion} and is currently working on the screen task: {detected_task}.
+#     User is looking for a way to improve mood.
+#     Suggest one concrete action to improve mood from this list. Try to give listning music and Watch funny videos as a priority:
+#     - Play music
+#     - Watch funny videos
+#     - Take a break
+#     - Quick game
+#     - If the user is working on a coding task and seems to need a help, then output "Coding Bot"
+#     - Nothing
+#     Respond ONLY with the exact phrase from the list.
+#     """
+
+#     # response = ollama.generate(
+#     #     model="qwen3:4b",
+#     #     prompt=prompt,
+#     #     options={"temperature": 0.2}
+#     # )
+#     respones = requests.post(
+#         "https://5a1b-192-248-50-253.ngrok-free.app/api/generate",
+#         headers={"Content-Type": "application/json"},
+#         json={
+#             "model": "qwen3:4b",
+#             "prompt": prompt,
+#             "stream": False,
+#             "options": {"temperature": 0.2}
+#         }
+#     )
+#     response = respones.json()
+#     print("Response from Ollama:", response)
+#     recommendation = clean_think_tags(response['response'].strip())
+#     state.recommendation = recommendation
+#     if not recommendation:
+#         recommendation = "No action needed"
+#     print(f"[Agent] Recommendation: {recommendation}")
+#     return {"recommendation": recommendation}
 def recommendation_agent(state):
+    # Early exit if no task detected
     if "No Need to Detect Task" in state.detected_task or not state.detected_task:
         print("[Agent] No task detected, skipping recommendation.")
         return {"recommendation": "No action needed"}
+    
     emotion = state.average_emotion.lower()
     detected_task = state.detected_task.lower() if state.detected_task else "unknown"
     print(f"[Agent] Calculating recommendation for emotion: {emotion} and task: {detected_task}")
-    negative_emotions = ["angry", "sad", "fear", "disgust", "stress","boring"]
-
+    
+    negative_emotions = ["angry", "sad", "fear", "disgust", "stress", "boring"]
+    
+    # Exit if not negative emotion
     if emotion not in negative_emotions:
         return {"recommendation": "No action needed"}
 
     prompt = f"""
-    User is feeling {emotion} and is currently working on the screen task: {detected_task}.
-    User is looking for a way to improve mood.
-    Suggest one concrete action to improve mood from this list. Try to give listning music and Watch funny videos as a priority:
-    - Play music
-    - Watch funny videos
-    - Take a break
-    - Quick game
-    - If the user is working on a coding task and seems to need a help, then output "Coding Bot"
-    - Nothing
-    Respond ONLY with the exact phrase from the list.
-    """
+        User is feeling {emotion} and is currently working on: {detected_task}.
+        Suggest one concrete action to improve mood from this list. Priority order:
+        1. Play music
+        2. Watch funny videos
+        3. Take a break
+        4. Quick game
+        5. Only if user is coding and needs help: "Coding Bot"
+        6. Nothing
 
-    response = ollama.generate(
-        model="qwen3:4b",
-        prompt=prompt,
-        options={"temperature": 0.2}
-    )
-    recommendation = clean_think_tags(response['response'].strip())
-    if not recommendation:
-        recommendation = "No action needed"
-    print(f"[Agent] Recommendation: {recommendation}")
-    return {"recommendation": recommendation}
+        Respond ONLY with the exact phrase from the list.
+    """
+    try:
+        response = requests.post(
+            "https://5a1b-192-248-50-253.ngrok-free.app/api/generate",  # Use local endpoint
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": "qwen3:4b",
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.2},
+                
+            }
+        )
+        
+        # Handle HTTP errors
+        if response.status_code != 200:
+            print(f"API error ({response.status_code}): {response.text[:100]}...")
+            return {"recommendation": "No action needed"}
+            
+        response_data = response.json()
+        print("Response from Ollama:", response_data)
+        # Clean response from <think> tags if present
+        recommendation = clean_think_tags(response_data.get('response', '')).strip()
+        
+        # Validate response format
+        valid_actions = [
+            "Play music", "Watch funny videos", "Take a break", 
+            "Quick game", "Coding Bot", "Nothing"
+        ]
+        
+        if recommendation not in valid_actions:
+            print(f"[Warning] Invalid recommendation: {recommendation}")
+            recommendation = "No action needed"
+        
+        # Store in state
+        state.recommendation = recommendation
+        print(f"Recommendation: {recommendation}")
+        return {"recommendation": recommendation}
+        
+    except Exception as e:
+        print(f"Error generating recommendation: {str(e)}")
+        return {"recommendation": "No action needed"}
 
 
 
