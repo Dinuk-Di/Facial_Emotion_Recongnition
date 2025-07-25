@@ -33,13 +33,13 @@ class AppController:
                 emotion = get_emotion()
                 hand = detect_hand()
 
-                avg = (0.3 * hand) + (0.7 * emotion)
-                print(f"[INFO] Avg Emotion: {avg:.2f}")
+                avg_array = (0.3 * hand) + (0.7 * emotion)
+                print(f"[INFO] Avg Emotion: {avg_array:.2f}")
 
                 time.sleep(60)  # Delay before agent runs
 
                 self.agent_mode = True
-                run_agent_system(avg)
+                run_agent_system(avg_array)
                 self.agent_mode = False
 
             else:
