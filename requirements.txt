@@ -8,4 +8,5 @@ opencv-python
 numpy
 tensorflow
 keras
+ollama
 

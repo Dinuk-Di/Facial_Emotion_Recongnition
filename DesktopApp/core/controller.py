@@ -26,21 +26,30 @@ class AppController:
         while self.running:
             if human_present():
                 self.last_seen = time.time()
-                sleepy = check_sleepy()
-                if sleepy:
-                    print("[ALERT] Sleepy detected! 🔔")
+                # sleepy = check_sleepy()
+                # if sleepy:
+                #     print("[ALERT] Sleepy detected! 🔔")
 
-                emotion = get_emotion()
-                hand = detect_hand()
+                # emotion = get_emotion()
+                # print(f"[INFO] Detected Emotion: {emotion}")
 
-                avg_array = (0.3 * hand) + (0.7 * emotion)
-                print(f"[INFO] Avg Emotion: {avg_array:.2f}")
+                # hand = detect_hand()
+                # print(f"[INFO] Detected Hand Movement: {hand}")
 
-                time.sleep(60)  # Delay before agent runs
+                # human_detector = human_present()
+                # print(f"[INFO] Human Detected: {human_detector}")
 
-                self.agent_mode = True
-                run_agent_system(avg_array)
-                self.agent_mode = False
+                sleep_detector = check_sleepy()
+                print(f"[INFO] Sleepy Detected: {sleep_detector}")
+                
+                # avg_array = (0.3 * hand) + (0.7 * emotion)
+                # print(f"[INFO] Avg Emotion: {avg_array:.2f}")
+
+                # time.sleep(60)  # Delay before agent runs
+
+                # self.agent_mode = True
+                # run_agent_system(avg_array)
+                # self.agent_mode = False
 
             else:
                 if time.time() - self.last_seen >= 300:
