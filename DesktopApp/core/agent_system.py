@@ -22,6 +22,7 @@ def run_agent_system(emotions):
     )
     agent_workflow = create_workflow()
     return agent_workflow.invoke(initial_state)
+
 class AgentState(BaseModel):
     emotions: List[str]
     average_emotion: Optional[str]
@@ -42,6 +43,8 @@ def create_workflow():
     workflow.add_edge("generate_recommendation", "execute_action")
     workflow.add_edge("execute_action", END)
     return workflow.compile()
+
+    
 
 
 def average_emotion_agent(state):

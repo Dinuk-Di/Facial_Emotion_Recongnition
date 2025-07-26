@@ -13,6 +13,5 @@ runs
 processed_videos
 disaster_agent_system
 venv
-
-
-
+dist
+build

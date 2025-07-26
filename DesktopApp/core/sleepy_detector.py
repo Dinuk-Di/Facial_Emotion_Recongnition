@@ -26,7 +26,7 @@ def check_sleepy(run_time: int = 10,
     # Load face detector & shape predictor
     face_detector = dlib.get_frontal_face_detector()
     shape_predictor = dlib.shape_predictor(
-        "D:/7th_semester/Final_year_project/Test_Codes/shape_predictor_68_face_landmarks.dat/shape_predictor_68_face_landmarks.dat"
+        "Models/shape_predictor_68_face_landmarks.dat"
     )
 
     cap = cv2.VideoCapture(cam_index)
