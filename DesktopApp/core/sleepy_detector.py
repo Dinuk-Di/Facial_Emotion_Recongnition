@@ -13,15 +13,19 @@ def detect_eye_aspect_ratio(eye_points):
     C = euclidean_distance(eye_points[0], eye_points[3])
     return (A + B) / (2.0 * C)
 
-def check_sleepy(run_time: int = 10, 
+def check_sleepy(
+        # run_time: int = 10, 
                  ear_threshold: float = 0.25, 
-                 close_duration: float = 3.0, 
-                 cam_index: int = 0):
+                #  close_duration: float = 3.0, 
+                #  cam_index: int = 0,
+                 frame= None):
     """
     Checks if the person appears sleepy by monitoring eye closure.
     Returns True if eyes are closed for >= close_duration seconds 
     during the observation window of run_time seconds.
     """
+
+    print("[Sleep Detector] Initializing...")
 
     # Load face detector & shape predictor
     face_detector = dlib.get_frontal_face_detector()
@@ -29,29 +33,16 @@ def check_sleepy(run_time: int = 10,
         "Models/shape_predictor_68_face_landmarks.dat"
     )
 
-    cap = cv2.VideoCapture(cam_index)
-    if not cap.isOpened():
-        print("[Sleep Detector] Camera not available.")
-        return False
 
-    start_time = time.time()
-    closed_eye_start = None
+    # start_time = time.time()
+    # closed_eye_start = None
     sleepy_detected = False
 
     try:
-        while time.time() - start_time < run_time:
-            ret, frame = cap.read()
-            if not ret:
-                time.sleep(0.05)
-                continue
-
+        while True:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = face_detector(gray)
-
-            if not faces:
-                closed_eye_start = None
-                continue
-
+          
             for face in faces:
                 landmarks = shape_predictor(gray, face)
 
@@ -66,17 +57,13 @@ def check_sleepy(run_time: int = 10,
 
                 # Check if eyes are closed
                 if EAR < ear_threshold:
-                    if closed_eye_start is None:
-                        closed_eye_start = time.time()
-                    else:
-                        if time.time() - closed_eye_start >= close_duration:
-                            sleepy_detected = True
-                            return True  # Early return if detected
+                        sleepy_detected = True
+                        
                 else:
-                    closed_eye_start = None
+                    sleepy_detected = False
 
-        return sleepy_detected
+            return sleepy_detected
 
-    finally:
-        cap.release()
-        cv2.destroyAllWindows()
+    except Exception as e:
+        print(f"[Sleep Detector] Error: {e}")
+        return False

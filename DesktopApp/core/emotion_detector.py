@@ -8,21 +8,18 @@ logger = logging.getLogger(__name__)
 def cleanup():
     cv2.destroyAllWindows()
 
-def get_emotion(run_time=10, conf_thres=0.5, cam_index=0):
+def get_emotion(run_time=10, conf_thres=0.5, cam_index=0,frame=None):
     """
     Captures webcam frames, detects faces, predicts emotions,
     and returns an array of predicted emotions over `run_time` seconds.
     """
+    print("[Emotion Assistant] Initializing...")
     face_detector = cv2.CascadeClassifier(
         cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
     )
     model = YOLO("Models/best_new.pt")
     class_names = ['Angry', 'Boring', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Stress', 'Suprise']
 
-    cap = cv2.VideoCapture(cam_index)
-    if not cap.isOpened():
-        logger.error("Camera error.")
-        return []
 
     print("[Emotion Assistant] Detection started...")
     emotion_window = []
@@ -30,10 +27,6 @@ def get_emotion(run_time=10, conf_thres=0.5, cam_index=0):
 
     try:
         while time.time() - start_time < run_time:
-            ret, frame = cap.read()
-            if not ret:
-                time.sleep(0.1)
-                continue
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = face_detector.detectMultiScale(gray, 1.1, 4)
@@ -52,8 +45,8 @@ def get_emotion(run_time=10, conf_thres=0.5, cam_index=0):
                     logger.warning(f"Model error: {e}")
 
         return emotion_window
-
-    finally:
-        cap.release()
-        cleanup()
+    except Exception as e:
+        logger.error(f"Error during emotion detection: {e}")
+        return []
+    
 

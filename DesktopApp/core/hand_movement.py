@@ -18,7 +18,8 @@ def detect_hand(run_time: int = 10,
                 cam_index: int = 0,
                 yolo_conf: float = 0.25,
                 conf_thres: float = 0.5,
-                min_person_area: int = 10_000):
+                min_person_area: int = 10_000,
+                frame=None):
     """
     Capture webcam frames for `run_time` seconds, detect the largest person using YOLO,
     classify the body/hand movement with a Keras model, and return the list of emotions
@@ -27,6 +28,7 @@ def detect_hand(run_time: int = 10,
     Returns:
         List[str]: e.g. ['Boring', 'Neutral', 'Stress', ...]
     """
+    print("[Hand Movement Assistant] Initializing...")
 
     # --- Load models ---
     try:
@@ -43,24 +45,13 @@ def detect_hand(run_time: int = 10,
         logger.error(f"Failed to load YOLO model: {e}")
         return []
 
-    # --- Open camera ---
-    cap = cv2.VideoCapture(cam_index)
-    if not cap.isOpened():
-        logger.error("Camera error: could not open webcam.")
-        return []
-
     print("[Hand Movement Assistant] Detection started...")
     emotions_window = []
     start_time = time.time()
 
     try:
         while time.time() - start_time < run_time:
-            ret, frame = cap.read()
-            if not ret:
-                time.sleep(0.05)
-                continue
-
-            # Optional: flip to match user's perspective
+              # Optional: flip to match user's perspective
             frame = cv2.flip(frame, 1)
 
             # Detect persons
@@ -106,10 +97,8 @@ def detect_hand(run_time: int = 10,
                         logger.warning(f"Emotion inference error: {e}")
                         continue
 
-            # (No GUI here; we only collect and return the array)
-
         return emotions_window
 
-    finally:
-        cap.release()
-        cleanup()
+    except Exception as e:
+        logger.error(f"Error during hand movement detection: {e}")
+        return []
