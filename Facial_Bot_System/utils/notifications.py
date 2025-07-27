@@ -42,7 +42,12 @@ def send_notification(recommendation,timeout=20):
     #     except Exception as e:
     #         print(f"Error executing script: {e}")
 
-    toast('Emotion Recognition Test ', str(recommendation) , icon=icon,  app_id="EMOFI", on_click=on_click, button='Dismiss')
+    try:
+        toast('Emotion Recognition Test ', str(recommendation) , icon=icon,  app_id="EMOFI", on_click=on_click, button='Dismiss')
+        print("notification sent")
+    except Exception as e:
+        print(f"Error sending notification: {e}")
+
 
     event.wait(timeout)
     return user_action

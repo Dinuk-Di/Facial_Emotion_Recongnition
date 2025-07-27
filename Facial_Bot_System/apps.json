@@ -1,0 +1,9 @@
+[
+    {"name": "Telegram Desktop", "location": "C:\\Users\\Nuwani\\Desktop\\Telegram.exe"},
+    {"name": "Discord", "location": "C:\\Users\\Nuwani\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Discord Inc\\Discord.lnk"},
+    {"name": "zoom", "location": "C:\\Users\\Nuwani\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Zoom\\Zoom Workplace.lnk"},
+    {"name": "Spotify (Direct Install)", "location": "C:\\Users\\Nuwani\\AppData\\Local\\Microsoft\\WindowsApps\\Spotify.exe"},
+    {"name": "Spotify (Microsoft Store)", "aumid": "shell:Appsfolder\\SpotifyAB.Spotify_8wekyb3d8bbwe!Spotify"},
+    {"name": "Microsoft Solitaire Collection", "aumid": "shell:Appsfolder\\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App"},
+    {"name": "Microsoft Solitaire Collection", "aumid": "shell:Appsfolder\\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App"}
+]

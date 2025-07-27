@@ -1,6 +1,11 @@
 import threading
 import time
 from face_detection import FaceEmotionDetector
+import ctypes
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)  # or 2 for per-monitor V2
+except:
+    pass  # Fail silently if this doesn't work
 
 def main():
     detector = FaceEmotionDetector()
