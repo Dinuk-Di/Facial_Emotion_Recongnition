@@ -27,15 +27,28 @@ class LoginWindow:
 
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
-        user = cursor.fetchone()
+
+        # Fetch all users
+        cursor.execute("SELECT * FROM users")
+        users = cursor.fetchall()
         conn.close()
 
-        if user:
+        if len(users) == 1:
+            # Only one user exists, auto-login with that user's username
+            print("[INFO] Only one user found. Logging in automatically.")
             self.root.destroy()
-            open_dashboard(username)
-        else:
-            messagebox.showerror("Login Failed", "Invalid username or password.")
+            open_dashboard(users[0][1])  # assuming column 1 is username
+            return
+
+        # Otherwise, match by entered credentials
+        for user in users:
+            if user[1] == username and user[2] == password:  # assuming [1]=username, [2]=password
+                self.root.destroy()
+                open_dashboard(username)
+                return
+
+        messagebox.showerror("Login Failed", "Invalid username or password.")
+
 
     def register(self):
         from ui.register import RegisterWindow

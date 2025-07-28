@@ -20,17 +20,7 @@ def detect_hand(run_time: int = 10,
                 conf_thres: float = 0.5,
                 min_person_area: int = 10_000,
                 frame=None):
-    """
-    Capture webcam frames for `run_time` seconds, detect the largest person using YOLO,
-    classify the body/hand movement with a Keras model, and return the list of emotions
-    predicted during that window.
-
-    Returns:
-        List[str]: e.g. ['Boring', 'Neutral', 'Stress', ...]
-    """
     print("[Hand Movement Assistant] Initializing...")
-
-    # --- Load models ---
     try:
         emotion_model = load_model('Models/hand_movement.h5')
     except Exception as e:
