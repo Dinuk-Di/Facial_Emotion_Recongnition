@@ -1,4 +1,7 @@
 @echo off
+setlocal
+cd /d "%~dp0"
+
 echo ========================================
 echo Facial Emotion Recognition - Build Tool
 echo ========================================
@@ -13,7 +16,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Check if virtual environment exists
+REM Create virtual environment if it doesn't exist
 if not exist "venv" (
     echo Creating virtual environment...
     python -m venv venv
@@ -28,11 +31,11 @@ REM Activate virtual environment
 echo Activating virtual environment...
 call venv\Scripts\activate.bat
 
-REM Install/upgrade pip
+REM Upgrade pip
 echo Upgrading pip...
 python -m pip install --upgrade pip
 
-REM Install requirements
+REM Install app dependencies
 echo Installing application dependencies...
 pip install -r requirements.txt
 if errorlevel 1 (
@@ -41,6 +44,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM Install build dependencies (e.g., pyinstaller)
 echo Installing build dependencies...
 pip install -r build_requirements.txt
 if errorlevel 1 (
@@ -49,38 +53,43 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Run the build script
+REM Run build script (should use PyInstaller inside)
 echo.
 echo Starting build process...
 python build_installer.py
+if errorlevel 1 (
+    echo ERROR: Build script failed
+    pause
+    exit /b 1
+)
 
-REM Check if build was successful
-if exist "dist\FacialEmotionRecognition\FacialEmotionRecognition.exe" (
-    echo.
+REM Check for built executable
+set "EXE_PATH=dist\FacialEmotionRecognition.exe"
+set "SETUP_PATH=FacialEmotionRecognition_Setup.exe"
+set "ZIP_PATH=FacialEmotionRecognition_Portable.zip"
+
+echo.
+if exist "%EXE_PATH%" (
     echo ========================================
     echo BUILD COMPLETED SUCCESSFULLY!
     echo ========================================
     echo.
     echo Generated files:
-    if exist "dist\FacialEmotionRecognition\FacialEmotionRecognition.exe" (
-        echo - Executable: dist\FacialEmotionRecognition\FacialEmotionRecognition.exe
+    echo - Executable: %EXE_PATH%
+    if exist "%SETUP_PATH%" (
+        echo - Installer: %SETUP_PATH%
     )
-    if exist "FacialEmotionRecognition_Setup.exe" (
-        echo - Installer: FacialEmotionRecognition_Setup.exe
-    )
-    if exist "FacialEmotionRecognition_Portable.zip" (
-        echo - Portable: FacialEmotionRecognition_Portable.zip
+    if exist "%ZIP_PATH%" (
+        echo - Portable: %ZIP_PATH%
     )
     echo.
     echo You can now distribute these files to users.
 ) else (
-    echo.
     echo ========================================
     echo BUILD FAILED!
     echo ========================================
-    echo.
     echo Please check the error messages above and try again.
 )
 
 echo.
-pause 
+pause

@@ -20,6 +20,12 @@ a = Analysis(
         ('utils/*.py', 'utils'),
     ],
     hiddenimports=[
+        'unittest',
+        'unittest.mock',
+        'torch',
+        'torch.ao.quantization',
+        'torch.fx.passes.shape_prop',
+        'torch.fx.passes.infra.pass_base',
         'customtkinter',
         'tkinter',
         'sqlite3',
