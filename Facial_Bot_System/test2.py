@@ -9,39 +9,90 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from utils.notifications import send_notification
+import win32gui
+import win32process
 
 launched_apps = {}
 opened_apps_info = [] 
 opened_browser_tabs: List[Dict] = []  
 thread = None
+previous_active_window = None
 # Timeout duration in seconds (15 minutes)
 APP_TIMEOUT_SECONDS = 30
 APP_WARNING_SECONDS = 20
 
+def get_active_window_info():
+    print("Inside the get_active_window_info")
+    hwnd = win32gui.GetForegroundWindow()
+    if hwnd:
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        window_title = win32gui.GetWindowText(hwnd)
+        print("Inside the get_active_window_info hwnd")
+        return {'hwnd': hwnd, 'pid': pid, 'title': window_title}
+    return None
+
+def restore_window(hwnd):
+    try:
+        # Check if minimized, restore it
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            time.sleep(0.1)
+
+        # Bring to foreground in a safer way:
+        # 1. Try SetForegroundWindow
+        win32gui.SetForegroundWindow(hwnd)
+        time.sleep(0.1)
+
+        # 2. Use AttachThreadInput to force foreground
+        import win32process
+        import win32api
+
+        fg_threadID, _ = win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())
+        target_threadID, _ = win32process.GetWindowThreadProcessId(hwnd)
+
+        # Attach input threads so we can force focus
+        if fg_threadID != target_threadID:
+            win32api.AttachThreadInput(target_threadID, fg_threadID, True)
+            win32gui.SetForegroundWindow(hwnd)
+            win32api.AttachThreadInput(target_threadID, fg_threadID, False)
+
+        # 3. Ensure window is shown
+        win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
+        win32gui.SetFocus(hwnd)
+
+        print("Successfully restored window")
+    except Exception as e:
+        print(f"Failed to restore window: {e}")
+
+
 def app_execution():
 
-    win32api.ShellExecute(
-        0,                      # hwnd: handle to parent window (0 for no parent)
-        "open",                 # operation: "open", "print", "edit", "explore", "find"
-        "explorer.exe",         # file: The program to execute (explorer.exe for shell:Appsfolder)
-        r"shell:Appsfolder\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App",           # parameters: The AUMID as a shell URI
-        None,                   # directory: default directory
-        win32con.SW_SHOWNORMAL  # show command: how the application is shown
-    )
-    time.sleep(2)  # Give app time to launch
-    processes = []
-    for proc in psutil.process_iter(['name']):
-        if proc.info['name'].lower() == "solitaire.exe":
-            processes.append(proc)
+    global previous_active_window
+    previous_active_window = get_active_window_info()
+    print("Previous active window: ", previous_active_window)
 
-    if processes:
-        opened_apps_info.append({
-            'type': 'desktop',
-            'processes': processes,
-            'app_name': "Microsoft Solitaire Collection",
-            'opened_at': time.time()
-        })
-        print("opened app info aumid process: ", opened_apps_info)
+    # win32api.ShellExecute(
+    #     0,                      # hwnd: handle to parent window (0 for no parent)
+    #     "open",                 # operation: "open", "print", "edit", "explore", "find"
+    #     "explorer.exe",         # file: The program to execute (explorer.exe for shell:Appsfolder)
+    #     r"shell:Appsfolder\Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe!App",           # parameters: The AUMID as a shell URI
+    #     None,                   # directory: default directory
+    #     win32con.SW_SHOWNORMAL  # show command: how the application is shown
+    # )
+    # time.sleep(2)  # Give app time to launch
+    # processes = []
+    # for proc in psutil.process_iter(['name']):
+    #     if proc.info['name'].lower() == "solitaire.exe":
+    #         processes.append(proc)
+
+    # if processes:
+    #     opened_apps_info.append({
+    #         'type': 'desktop',
+    #         'processes': processes,
+    #         'app_name': "Microsoft Solitaire Collection",
+    #         'opened_at': time.time()
+    #     })
+    #     print("opened app info aumid process: ", opened_apps_info)
    
 
     win32api.ShellExecute(
@@ -153,9 +204,19 @@ def start_monitoring_thread(interval_sec=60):
         app_is_closed = False
         while not app_is_closed:
             app_is_closed = monitor_opened_apps()
+            print("is_closed :", app_is_closed)
+            if app_is_closed and previous_active_window:
+                print("restoring function to be started 1")
+                hwnd = previous_active_window['hwnd']
+                if win32gui.IsWindow(hwnd):
+                    print("Restoring previous window")
+                    restore_window(hwnd)
+                else:
+                    print("Previous window is no longer available")    
     print("start monitoring")
     thread = threading.Thread(target=monitor_loop, daemon=False)
     thread.start()
+    
     
 
 if __name__ == "__main__":
