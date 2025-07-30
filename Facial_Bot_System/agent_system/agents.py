@@ -83,14 +83,10 @@ from utils.selection_window import selection_window
 from tools.recommender_tools import open_recommendation
 from utils.runner_interface import launch_window
 import requests
-import ollama
 import ctypes
 from collections import Counter
 import psutil
-from typing import Optional,Dict, List
-import os
-import subprocess
-from app_config import kNOWN_APPS_LIST
+from typing import Dict, List
 
 launched_apps = {}
 opened_browser_instances = []  # Track browser instances we launched
@@ -246,9 +242,9 @@ def recommendation_agent(state):
         User is looking for a way to improve mood.
 
         There are two outputs. 
-        - 'recommendation': Suggestion to improve the mood. Give the most suitable option from the list:-["Listen to songs", "Chat with friends", "Watch funny videos", "Call a friend", "Play Quick game", "Do painting"]
+        - 'recommendation': Suggestion to improve the mood. Give the most suitable option from the list:-["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
         - 'recommendation_options': list of 3 apps that is most suitable to accomplish the given recommendation. 
-        The recommendation_options should be apps from the list eg:-[ Telegram Desktop, Microsoft Teams, WhatsApp, Skype, Zoom, Discode, Paint, Spotify, Facebook, Instergram, Youtube, Microsoft Solitaire Collection] or any other suitable. 
+        The recommendation_options should be apps from the list eg:-[ Discord, Spotify, Paint, Microsoft Teams, Telegram Desktop, Zoom, Youtube, Facebook, Instergram, Microsoft Solitaire Collection] or any other suitable. 
         Response Formate:
         recommendation: Chat with friends
         recommendation_options: [
@@ -258,32 +254,6 @@ def recommendation_agent(state):
         ]
         Respond ONLY with the exact phrase from the list.
         """
-
-    # response = ollama.generate(
-    #     model="qwen3:4b",
-    #     prompt=prompt,
-    #     options={"temperature": 0.2}
-    # )
-    # response_text = response["response"]
-    # print("Recommendation is done.")
-    # print("[Agent] Raw LLM Response:", response_text)
-    
-    # try:
-    #     recommendation, recommendation_options = parse_llm_response(response_text)
-    # except Exception as e:
-    #     print("[Agent] Error parsing response:", e)
-    #     recommendation = "No action needed"
-    #     recommendation_options = []
-
-    # if not recommendation or not recommendation_options:
-    #     recommendation = "No action needed"
-    #     recommendation_options = []
-
-    # print(f"[Agent] Recommendation: {recommendation}, recommendation_options: {recommendation_options}")
-    # return {
-    #     "recommendation": recommendation,
-    #     "recommendation_options": recommendation_options
-    # }
 
     try:
         response = requests.post(
@@ -309,7 +279,7 @@ def recommendation_agent(state):
         recommendation, recommendation_options = parse_llm_response(response_data.get('response', ''))
         
         # Validate response format
-        valid_recommendation = ["Listen to songs", "Chat with friends", "Watch funny videos", "Call a friend", "Play Quick game", "Do painting"]
+        valid_recommendation = ["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
         
         if recommendation not in valid_recommendation:
             print(f"[Warning] Invalid recommendation: {recommendation}")
@@ -354,171 +324,21 @@ def task_execution_agent(state):
             if selected_option:
                 start_time = time.time()
                 open_recommendation(selected_option) # Execute the task based on the option
+                print("Task is executed")
                 return {
                     "executed": True,
                     "action_time_start": start_time
                 }
                     
-    # send_blocking_message(
-    #     title="Emotion Assistant",
-    #     message=f"You seem {state.average_emotion}. Recommendation: {recommended_output}"
-    # )
-
-
-def close_opened_apps() -> bool:
-    global launched_apps, opened_browser_instances, opened_browser_tabs
-    success = True
-    
-    # Close regular applications first
-    for process_name, process in list(launched_apps.items()):
-        try:
-            if process.is_running():
-                process.terminate()
-                launched_apps.pop(process_name)
-        except Exception as e:
-            print(f"Error closing {process_name}: {e}")
-            success = False
-
-    # Special handling for Selenium-controlled browsers
-    for tab in list(opened_browser_tabs):
-        try:
-            if 'driver' in tab:  # Selenium-controlled tab
-                try:
-                    # Try to close gracefully first
-                    tab['driver'].quit()
-                    print(f"Closed Selenium browser session for {tab['url']}")
-                except Exception as e:
-                    print(f"Error closing Selenium session: {str(e)}")
-                    # Fallback to process termination
-                    for proc in psutil.process_iter(['pid', 'name']):
-                        if proc.info['name'].lower() in ('chrome.exe', 'chromedriver.exe'):
-                            try:
-                                proc.terminate()
-                                proc.wait(timeout=1)
-                            except:
-                                proc.kill()
-        except Exception as e:
-            print(f"Error closing tab {tab.get('url')}: {str(e)}")
-            success = False
-    
-    # Additional cleanup for Chrome processes
-    try:
-        for proc in psutil.process_iter(['name']):
-            name = proc.info['name'].lower()
-            if name in ('chrome.exe', 'chromedriver.exe', 'msedge.exe'):
-                try:
-                    proc.terminate()
-                    print("Inside the aditional cleanup")
-                    try:
-                        proc.wait(timeout=1)
-                        print("Inside the wait in aditional cleanup")
-                    except psutil.TimeoutExpired:
-                        proc.kill()
-                except Exception as e:
-                    print(f"Error cleaning up {name}: {str(e)}")
-    except Exception as e:
-        print(f"Error in process cleanup: {str(e)}")
-    
-    opened_browser_tabs.clear()
-    print("Cleared all in opened_browser_tabs")
-    return success
-
-   
-# def task_exit_agent(state):
-#     executed_state = state.executed
-#     start_time = state.action_time_start
-#     delay_time = 1 # delay before closing
-#     closing_text = "Time to get back to work"
-
-#     while executed_state:
-#         elapsed = time.time() - start_time
-#         if elapsed >= delay_time * 60:
-#             status = send_notification(closing_text)
-            
-#             if status:
-#                 print("Closing action....")
-#                 break
-#             else:
-#                 start_time = time.time()
-#                 delay_time = 0.1
-#         time.sleep(1)
-
-#     return {
-#         "executed": False,
-#         "action_time_start": None
-#     }
-
 def task_exit_agent(state):
+    task_executed = True
     if not state.executed:
         return {"executed": False, "action_time_start": None}
-
-    start_time = state.action_time_start
-    closing_text = "Time to get back to work"
-    notification_count = 0
-    max_notifications = 2
-    total_duration = 60
-    notification_interval = total_duration / max_notifications
-
-    while state.executed:
-        elapsed = time.time() - start_time
-        
-        if notification_count < max_notifications and elapsed >= (notification_count + 1) * notification_interval:
-            if send_notification(closing_text):
-                notification_count += 1
-                print(f"Reminder {notification_count}/{max_notifications} shown")
-        
-        if elapsed >= total_duration:
-            print("Closing all applications and browser tabs...")
-            # First try to gracefully close the browser
-            #close_success = close_opened_apps()
-
-            # If that fails, try more forceful methods
-            # if not close_success:
-            #     print("Graceful close failed, trying alternative methods...")
-            #     force_close_browsers()
-            
-            break
-            
-        time.sleep(1)
+    print("Thread is running")
+    while task_executed:
+        time.sleep(35)
+        task_executed = False
+    print("Thread is closed")
 
     return {"executed": False, "action_time_start": None}
 
-# def force_close_browsers():
-#     """More aggressive method to close browsers if normal methods fail"""
-#     browser_names = ['chrome', 'firefox', 'edge', 'opera', 'msedge']
-    
-#     for proc in psutil.process_iter(['name']):
-#         try:
-#             name = proc.info['name'].lower()
-#             if any(browser in name for browser in browser_names):
-#                 print(f"Force closing browser: {name}")
-#                 proc.terminate()
-#                 try:
-#                     proc.wait(timeout=2)
-#                 except psutil.TimeoutExpired:
-#                     proc.kill()
-#         except (psutil.NoSuchProcess, psutil.AccessDenied):
-#             continue
-
-
-def force_close_browsers():
-    """More aggressive method to close browsers if normal methods fail"""
-    browser_names = []
-    
-    # Only close browsers we opened
-    for tab in opened_browser_tabs:
-        if 'browser' in tab:
-            browser_names.append(tab['browser'])
-    
-    for proc in psutil.process_iter(['name']):
-        try:
-            name = proc.info['name'].lower()
-            if any(browser in name for browser in browser_names):
-                print(f"Force closing browser: {name}")
-                proc.terminate()
-                try:
-                    proc.wait(timeout=2)
-                except psutil.TimeoutExpired:
-                    proc.kill()
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            continue

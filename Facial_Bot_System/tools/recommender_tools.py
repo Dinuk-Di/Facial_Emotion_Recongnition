@@ -14,7 +14,6 @@ import uuid
 from PySide6.QtWidgets import QApplication, QMessageBox
 from app_config import kNOWN_APPS_LIST
 from communication_apps_config import COMMUNICATION_APPS_LIST
-
 import json
 import sqlite3
 from datetime import datetime, timedelta
@@ -26,16 +25,25 @@ from telethon.tl import functions  # Add this with other imports
 from telethon.tl.functions.contacts import GetContactsRequest
 from telethon.tl.functions.messages import GetHistoryRequest
 import asyncio
-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from utils.notifications import send_notification
 
+import time
+import threading
 
 launched_apps = {}
 opened_browser_instances = []  # Track browser instances we launched
 opened_browser_tabs: List[Dict] = []  # Track individual tabs
+# Store opened apps info with timestamps
+opened_apps_info = []  # Each item: dict with keys: type='desktop'|'web', process=psutil.Process, opened_at=timestamp, driver=webdriver (optional)
+
+# Timeout duration in seconds (15 minutes)
+APP_TIMEOUT_SECONDS = 30
+APP_WARNING_SECONDS = 20
+
 
 def get_browser_path(browser_name: str) -> Optional[str]:
     """Get the path to the browser executable based on name"""
@@ -69,314 +77,22 @@ def is_app_installed(app_name: str) -> bool:
     
     return False
 
-def initiate_telegram_call(contact_id: str, is_installed: bool):
-    """
-    Directly initiates a Telegram call with 100% reliability
-    Works for both native app and web version
-    """
-    try:
-        if is_installed:
-            # Native app call - most reliable method
-            url = f"tg://call?id={contact_id}" if contact_id.isdigit() else f"tg://call?domain={contact_id.lstrip('@')}"
-            try:
-                # First ensure Telegram is running
-                telegram_running = any(p.info['name'] == 'Telegram.exe' for p in psutil.process_iter(['name']))
-                if not telegram_running:
-                    # Launch Telegram first if not running
-                    telegram_path = os.path.join(os.getenv('APPDATA'), 'Telegram Desktop', 'Telegram.exe')
-                    if os.path.exists(telegram_path):
-                        subprocess.Popen([telegram_path])
-                        time.sleep(2)  # Wait for app to launch
-                
-                win32api.ShellExecute(0, "open", url, None, None, win32con.SW_SHOWNORMAL)
-                print(f"✅ Successfully initiated native Telegram call to {contact_id}")
-                return True
-            except Exception as e:
-                print(f"⚠️ Native call failed: {e}, falling back to web")
-                is_installed = False
-
-        # Web version handling with direct call initiation
-        if not is_installed:
-            try:
-                # Initialize Chrome WebDriver with options
-                options = webdriver.ChromeOptions()
-                options.add_argument("--disable-notifications")
-                options.add_argument("--use-fake-ui-for-media-stream")  # Auto-accept microphone permission
-                
-                driver = webdriver.Chrome(options=options)
-                
-                # Open the chat URL
-                base_url = f"https://web.telegram.org/k/#{contact_id}"
-                driver.get(base_url)
-                print(f"🌐 Opened Telegram Web chat with {contact_id}")
-                
-                try:
-                    # Wait for call button and click it
-                    wait = WebDriverWait(driver, 15)
-                    call_button = wait.until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, '.btn-circle[title="Voice call"]'))
-                    )
-                    call_button.click()
-                    print("📞 Successfully clicked call button")
-                    
-                    # Handle the call permission popup if it appears
-                    try:
-                        permission_popup = wait.until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, '.popup-title')))
-                        if "use your microphone" in permission_popup.text:
-                            allow_btn = driver.find_element(By.CSS_SELECTOR, '.btn-primary')
-                            allow_btn.click()
-                            print("✅ Allowed microphone access")
-                    except:
-                        pass  # No permission popup appeared
-                    
-                    return True
-                except Exception as e:
-                    print(f"⚠️ Couldn't click call button automatically: {e}")
-                    # Fallback - open with call parameter
-                    driver.get(f"{base_url}?call=1")
-                    return False
-            except Exception as e:
-                print(f"❌ Selenium failed: {e}")
-                # Ultimate fallback - just open the URL
-                webbrowser.open(f"https://web.telegram.org/k/#{contact_id}?call=1", new=2)
-                return False
-    except Exception as e:
-        print(f"❌ Telegram call failed completely: {e}")
-        return False
-
 def open_recommendation(recommendation: dict) -> str:
-    global launched_apps, opened_browser_tabs
+
+    global launched_apps, opened_browser_tabs, opened_apps_info
+
     print(f"[Open_recommendation] {recommendation}")
     url = recommendation.get("app_url", "")
     app_name = recommendation.get("app_name", "")
     app_name_lower = app_name.lower()
 
-    if app_name in COMMUNICATION_APPS_LIST:
-        try:
-            app_installed = is_app_installed(app_name)
-            app = QApplication.instance() or QApplication([])
-
-            # Get REAL contacts
-            print("Going to get recent contacts in telegram")
-            recent_contacts = get_recent_contacts(app_name)
-
-            print("Contact window is ready to be opened")
-            window = ContactWindow(
-                app_name=app_name,
-                is_installed=app_installed,
-                app_config=COMMUNICATION_APPS_LIST[app_name],
-                contacts = recent_contacts
-            )
-            window.show()
-
-            def execute_telegram_action(action: str, contact_id: str, is_installed: bool):
-                """
-                Directly executes Telegram actions (call/chat) with 100% reliability
-                Handles both native app and web versions
-                """
-                try:
-                    if is_installed:
-                        # Native app handling
-                        if action == "call":
-                            url = f"tg://call?id={contact_id}" if contact_id.isdigit() else f"tg://call?domain={contact_id.lstrip('@')}"
-                        else:  # chat
-                            url = f"tg://resolve?id={contact_id}" if contact_id.isdigit() else f"tg://resolve?domain={contact_id.lstrip('@')}"
-                        
-                        try:
-                            # Ensure Telegram is running
-                            telegram_running = any(p.info['name'] == 'Telegram.exe' for p in psutil.process_iter(['name']))
-                            if not telegram_running:
-                                telegram_path = os.path.join(os.getenv('APPDATA'), 'Telegram Desktop', 'Telegram.exe')
-                                if os.path.exists(telegram_path):
-                                    subprocess.Popen([telegram_path])
-                                    time.sleep(2)  # Wait for app to launch
-                            
-                            win32api.ShellExecute(0, "open", url, None, None, win32con.SW_SHOWNORMAL)
-                            print(f"✅ Successfully initiated {action} via native app")
-                            return True
-                        except Exception as e:
-                            print(f"⚠️ Native {action} failed: {e}, falling back to web")
-                            is_installed = False
-
-                    # Web version handling
-                    if not is_installed:
-                        if action == "call":
-                            try:
-                                # Use Selenium for reliable call initiation
-                                from selenium import webdriver
-                                from selenium.webdriver.common.by import By
-                                from selenium.webdriver.support.ui import WebDriverWait
-                                from selenium.webdriver.support import expected_conditions as EC
-                                
-                                options = webdriver.ChromeOptions()
-                                options.add_argument("--disable-notifications")
-                                options.add_argument("--use-fake-ui-for-media-stream")
-                                
-                                driver = webdriver.Chrome(options=options)
-                                base_url = f"https://web.telegram.org/k/#{contact_id}"
-                                driver.get(base_url)
-                                
-                                # Wait and click call button
-                                wait = WebDriverWait(driver, 15)
-                                call_button = wait.until(
-                                    EC.element_to_be_clickable((By.CSS_SELECTOR, '.btn-circle[title="Voice call"]'))
-                                )
-                                call_button.click()
-                                print("📞 Successfully initiated call in web version")
-                                return True
-                            except Exception as e:
-                                print(f"⚠️ Web call automation failed: {e}")
-                                # Fallback to simple URL open
-                                webbrowser.open(f"{base_url}?call=1", new=2)
-                                return False
-                        else:  # chat
-                            url = f"https://web.telegram.org/k/#{contact_id}" if contact_id.isdigit() else f"https://web.telegram.org/k/#@{contact_id.lstrip('@')}"
-                            webbrowser.open(url, new=2)
-                            print(f"💬 Opened chat in web version")
-                            return True
-                            
-                except Exception as e:
-                    print(f"❌ Telegram {action} failed completely: {e}")
-                    return False
-
-
-
-            def _handle_contact_action(data: dict):
-                """Handle message/call actions for selected contact"""
-                action = data["action"]  # "chat" or "call"
-                contact = data["contact"]
-                app_config = data["app_config"]
-                is_installed = data["is_installed"]
-                contact_id = contact.get("id", "")
-            #     # Build the appropriate URL
-            #     url_template = app_config["deep_links" if is_installed else "web_urls"][action]
-            #     url = url_template.format(
-            #         phone=contact.get("phone", "").replace("+", ""),
-            #         id=contact.get("id", "")
-            #     )
-            #     native_launch_attempted = False
-            #     # Try native app launch first
-            #     for app_info in kNOWN_APPS_LIST:
-            #         if app_name_lower == app_info["name"].lower():
-            #             try:
-            #                 native_launch_attempted = True
-            #                 if "aumid" in app_info:
-            #                     win32api.ShellExecute(0, "open", "explorer.exe", app_info["aumid"], None, win32con.SW_SHOWNORMAL)
-            #                     time.sleep(2)  # Wait for app to launch
-            #                 elif "location" in app_info:
-            #                     win32api.ShellExecute(0, "open", app_info["location"], None, None, win32con.SW_SHOWNORMAL)
-            #                     time.sleep(2)
-
-            #                 time.sleep(2)  # Wait for app to launch
-            #                 print("opened system installed app inside handle contacts")
-            #                 return 
-            #             except Exception as e:
-            #                 print(f"Native launch failed: {e}")
-            #                 break  # Exit loop if native launch fails
-            #     # Open the deep link/web URL
-            #     if not native_launch_attempted:
-            #         webbrowser.open(url)
-            #         print("Fell back to web version")
-            # return f"Showed {app_name} contact list"
-  
-                try:
-                    # Special handling for Telegram
-                    if "telegram" in app_config.get("name", "").lower():
-                        if not execute_telegram_action(action, contact_id, is_installed):
-                            QMessageBox.warning(None, "Action Failed", f"Could not initiate {action} with {contact.get('name')}")
-                        return
-
-                    # Standard handling for other apps
-                    url_template = app_config["native" if is_installed else "web"][action]
-                    url = url_template.format(
-                        id=contact_id,
-                        phone=contact.get("phone", "").replace("+", "")
-                    )
-
-                    if is_installed and os.name == 'nt':
-                        try:
-                            win32api.ShellExecute(0, "open", url, None, None, win32con.SW_SHOWNORMAL)
-                            return
-                        except Exception as e:
-                            print(f"Native launch failed: {e}")
-
-                    webbrowser.open(url, new=2)
-
-                except Exception as e:
-                    error_msg = f"Failed to initiate {action}: {str(e)}"
-                    print(error_msg)
-                    QMessageBox.warning(None, "Action Failed", error_msg)
-                # try:
-                #     contact_id = contact.get("id", "")
-                #     phone = contact.get("phone", "")
-                    
-                #     # Telegram-specific handling
-                #     if "telegram" in app_config.get("name", "").lower():
-                #         if contact_id.isdigit():  # Numerical ID (e.g., 1958315573)
-                #             if is_installed:
-                #                 url = f"tg://call?id={contact_id}"
-                #             else:
-                #                 # Correct web URL format for numerical IDs
-                #                 url = f"https://web.telegram.org/k/#{contact_id}"
-                #                 if action == "call":
-                #                     # Note: Web Telegram requires manual call initiation
-                #                     url += "?call=1"
-                #         else:  # Username (e.g., BotFather)
-                #             if is_installed:
-                #                 url = f"tg://call?domain={contact_id.lstrip('@')}"
-                #             else:
-                #                 # Correct web URL format for usernames
-                #                 url = f"https://web.telegram.org/k/#@{contact_id.lstrip('@')}"
-                #                 if action == "call":
-                #                     # Note: Web Telegram requires manual call initiation
-                #                     url += "?call=1"
-                #     else:
-                #         # Handle other apps (WhatsApp, etc.)
-                #         url_template = app_config["native" if is_installed else "web"][action]
-                #         url = url_template.format(
-                #             id=contact.get("id", ""),
-                #             phone=phone.replace("+", "") if phone else ""
-                #         )
-
-                #     # Execute the action
-                #     if is_installed and os.name == 'nt':
-                #         try:
-                #             # Verify Telegram is actually running
-                #             if "telegram" in app_config.get("name", "").lower():
-                #                 telegram_running = any(p.info['name'] == 'Telegram.exe' 
-                #                                     for p in psutil.process_iter(['name']))
-                #                 if not telegram_running:
-                #                     raise Exception("Telegram not running")
-                            
-                #             win32api.ShellExecute(0, "open", url, None, None, win32con.SW_SHOWNORMAL)
-                #             print(f"Successfully initiated {action} via native app")
-                #             return
-                #         except Exception as e:
-                #             print(f"Native launch failed ({e}), falling back to web")
-                #             is_installed = False
-
-                #     # Fallback to web version
-                #     webbrowser.open(url,new=2)
-                #     print(f"Opened {action} in browser: {url}")
-
-                # except Exception as e:
-                #     error_msg = f"Failed to initiate {action} with {contact.get('name')}: {str(e)}"
-                #     print(error_msg)
-                #     QMessageBox.warning(None, "Action Failed", error_msg)
-
-            window.contact_selected.connect(_handle_contact_action)
-            app.exec()
-        except Exception as e:
-                    print(f"Error showing contact window: {e}")
-                    webbrowser.open(COMMUNICATION_APPS_LIST[app_name]["web_urls"]["chat"])
-                    return f"Opened {app_name} web version as fallback"
-
     for app_info in kNOWN_APPS_LIST:
         # Check for a match (case-insensitive, allows partial for longer names)
         if app_name_lower == app_info["name"].lower() or \
            (app_name_lower in app_info["name"].lower() and len(app_name_lower) > 2):
-         
+
+            # Desktop app launch path
+            process = None
             if "aumid" in app_info and app_info["aumid"]:
                 aumid_to_use = app_info["aumid"]
                 try:
@@ -388,11 +104,22 @@ def open_recommendation(recommendation: dict) -> str:
                         None,                   # directory: default directory
                         win32con.SW_SHOWNORMAL  # show command: how the application is shown
                     )
+
                     time.sleep(2)  # Give app time to launch
+                    processes = []
                     for proc in psutil.process_iter(['name']):
                         if proc.info['name'].lower() == app_info["process"].lower():
-                            launched_apps[app_info["process"]] = proc
-                            break
+                            processes.append(proc)
+
+                    if processes:
+                        opened_apps_info.append({
+                            'type': 'desktop',
+                            'processes': processes,
+                            'app_name': app_info["name"],
+                            'opened_at': time.time()
+                        })
+                        print("opened app info aumid process: ", opened_apps_info)
+                    start_monitoring_thread()
                     return f"Successfully launched {app_info['name']} via AUMID: '{aumid_to_use}'."
                 except Exception as e:
                     return f"Error launching {app_info['name']} via AUMID '{aumid_to_use}': {e}"
@@ -414,15 +141,24 @@ def open_recommendation(recommendation: dict) -> str:
                     )
                     
                     time.sleep(2)  # Give app time to launch
+                    matching_procs = []
                     for proc in psutil.process_iter(['name']):
-                        if proc.info['name'].lower() == app_info["process"].lower():
-                            launched_apps[app_info["process"]] = proc
-                            break
-                    # if os.path.isdir(app_path_to_use):
-                    #     subprocess.Popen(f'start "" "{app_path_to_use}"', shell=True)
-                    #     return f"Opened folder for {app_info['name']}: {app_path_to_use}. (App might not launch directly from folder path)"
-                    
-                    # subprocess.Popen(f'"{app_path_to_use}"', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        try:
+                            if proc.info['name'].lower() == app_info["process"].lower():
+                                matching_procs.append(proc)
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            continue
+
+                    if matching_procs:
+                        # Save the list of processes instead of single process
+                        opened_apps_info.append({
+                            'type': 'desktop',
+                            'processes': matching_procs,
+                            'app_name': app_info["name"],
+                            'opened_at': time.time()
+                        })
+                        print("opened_app_info : ",opened_apps_info)
+                    start_monitoring_thread()
                     return f"Successfully launched {app_info['name']} using path: {app_path_to_use}."
                 except Exception as e:
                     return f"Error launching {app_info['name']} from {app_path_to_use}: {e}"
@@ -434,38 +170,100 @@ def open_recommendation(recommendation: dict) -> str:
             if recommendation.get("search_query"):
                 search = recommendation["search_query"].replace(" ", "+")
                 url += f"/results?search_query={search}"
-            
-            try:
-                from selenium import webdriver
-                driver = webdriver.Chrome()  # Or reuse existing driver
-                driver.get(url)
-                opened_browser_tabs.append({
-                    'url': url,
-                    'browser': 'chrome',  # or 'firefox', 'edge'
-                    'method': 'selenium',
-                    'driver': driver,
-                    'window_handle': driver.current_window_handle,
-                    'opened_at': time.time()
-                })
-                print("content of opened_browser_tabs: ",opened_browser_tabs);
-                return f"Opened {url} in new browser tab (Selenium-controlled)."
-            except Exception as selenium_error:
-                # Fallback to webbrowser module
-                webbrowser.open(url)
-                opened_browser_tabs.append({
-                    'url': url,
-                    'time': time.time(),
-                    'browser': webbrowser.get().name.lower(),
-                    'method': 'webbrowser',
-                    'pid': psutil.Process().pid,
-                    'opened_at': time.time()
-                })
-                return f"Opened {url} in default browser tab."
-        except Exception as e:
+            # Open new Selenium browser window each time
+            print("Web URL: ", url)
+            options = webdriver.ChromeOptions()
+            options.add_argument("--new-window")  # Open in new window
+            driver = webdriver.Chrome(options=options)
+            driver.get(url)
+
+
+            opened_browser_tabs.append({
+                'url': url,
+                'browser': 'chrome',
+                'method': 'selenium',
+                'driver': driver,
+                'window_handle': driver.current_window_handle,
+                'opened_at': time.time()
+            })
+
+            opened_apps_info.append({
+                'type': 'web',
+                'driver': driver,
+                'url': url,
+                'opened_at': time.time()
+            })
+            print("opened app info: ", opened_apps_info)
+            start_monitoring_thread()
+            return f"Opened {url} in default browser tab."
+        except Exception as selenium_error:
+            webbrowser.open(url)
             return f"Failed to open URL '{url}': {e}"
 
     return f"Recommendation '{recommendation}' is neither a recognized URL nor a known application."
     
+def terminate_process_tree(proc):
+    try:
+        children = proc.children(recursive=True)
+        for child in children:
+            try:
+                child.terminate()
+            except Exception:
+                pass
+        proc.terminate()
+        gone, alive = psutil.wait_procs([proc] + children, timeout=5)
+        for p in alive:
+            try:
+                p.kill()
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Error terminating process tree: {e}")
+
+def close_tracked_app(app_info):
+    try:
+        if app_info['type'] == 'desktop':
+            for proc in app_info.get('processes', []):
+              terminate_process_tree(proc)
+            print(f"Closed desktop app: {app_info.get('app_name')}")
+        elif app_info['type'] == 'web':
+            driver = app_info.get('driver')
+            if driver:
+                driver.quit()
+                return True 
+            print(f"Closed browser window for URL: {app_info.get('url')}")
+    except Exception as e:
+        print(f"Error closing app: {e}")
+
+def monitor_opened_apps():
+    current_time = time.time()
+    to_remove = []
+    is_closed = False
+    closing_text = "Time to get back to work"
+    
+    for app_info in opened_apps_info:
+        if abs((current_time - app_info['opened_at']) - APP_WARNING_SECONDS) <= 1: 
+            user_action = send_notification(closing_text)
+            if user_action:
+                is_closed = close_tracked_app(app_info)
+                to_remove.append(app_info)
+        elif current_time - app_info['opened_at'] >= APP_TIMEOUT_SECONDS:
+            is_closed = close_tracked_app(app_info)
+            to_remove.append(app_info)
+        
+    for app_info in to_remove:
+        opened_apps_info.remove(app_info)
+    return is_closed
+
+def start_monitoring_thread(interval_sec=60):
+    def monitor_loop():
+        app_is_closed = False
+        while not app_is_closed:
+            app_is_closed = monitor_opened_apps()
+    print("start monitoring")
+    thread = threading.Thread(target=monitor_loop, daemon=False)
+    thread.start()
+    print("opened app info: ", opened_apps_info)
 
 def find_process_by_name(process_name: str, timeout: int = 5) -> Optional[psutil.Process]:
     """Helper to find a process by name with timeout"""

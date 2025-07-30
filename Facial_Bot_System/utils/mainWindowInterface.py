@@ -358,9 +358,17 @@ class InteraceMainwindow(object):
     def updateLayoutShow(self, Recommend_Group):
         self.recommend_group.setVisible(True)
     
-    def show_search(self, show=True):
-        self.search_frame.setVisible(show)
-        self.ChoiceFrame.setVisible(not show)
+    def show_search(self, search_type="youtube"):
+        """Show search frame with type-specific settings"""
+        self.search_frame.setVisible(True)
+        self.ChoiceFrame.setVisible(False)
+        
+        if search_type == "telegram":
+            self.search_input.setPlaceholderText("Enter Telegram username (e.g., @username)")
+            self.search_button.setText("Find User")
+        else:  # youtube
+            self.search_input.setPlaceholderText("Enter search query...")
+            self.search_button.setText("Search")
 
     def on_search_clicked(self):
         search_query = self.search_input.text()
@@ -370,8 +378,13 @@ class InteraceMainwindow(object):
             if hasattr(self, 'selected_choice'):
                 search_query = self.selected_choice.get('search_query', '')
         
-        if hasattr(self, 'search_callback'):
-            self.search_callback(search_query)
+        # Determine which callback to use based on placeholder text
+        if "Telegram username" in self.search_input.placeholderText():
+            if hasattr(self, 'telegram_search_callback'):
+                self.telegram_search_callback(search_query)
+        else:
+            if hasattr(self, 'search_callback'):
+                self.search_callback(search_query)
         self.show_search(False)
 
     def on_cancel_clicked(self):
