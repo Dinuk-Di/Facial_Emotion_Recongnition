@@ -446,7 +446,7 @@ class AppController:
                         if eye_closed:
                             if self.eye_closed_since is None:
                                 self.eye_closed_since = current_time
-                            elif (current_time - self.eye_closed_since >= 30) and not self.alert_triggered:
+                            elif (current_time - self.eye_closed_since >= 60) and not self.alert_triggered:
                                 self.alert_triggered = True
                                 self.buzzer_and_notify()
                         else:
@@ -489,22 +489,26 @@ class AppController:
                 if hand_result:
                     self.log(f"[Hand Detection] Detected: {hand_result}")
 
+                self.emotion_log.extend(emotion_result)
+                self.emotion_log.extend(hand_result)
+
                 self.emotion_counter.update(emotion_result)
                 self.hand_counter.update(hand_result)
 
-                if self.frame_count % 10 == 0:
-                    top_emotion = self.emotion_counter.most_common(1)
-                    top_hand = self.hand_counter.most_common(1)
 
-                    if top_hand and top_hand[0][1] >= 2:
-                        self.data_buffer.append({"type": "hand", "value": top_hand[0][0], "time": current_time})
-                    elif top_emotion and top_emotion[0][1] >= 3:
-                        self.data_buffer.append({"type": "emotion", "value": top_emotion[0][0], "time": current_time})
+                # if self.frame_count % 10 == 0:
+                #     top_emotion = self.emotion_counter.most_common(1)
+                #     top_hand = self.hand_counter.most_common(1)
 
-                    self.emotion_counter.clear()
-                    self.hand_counter.clear()
+                #     if top_hand and top_hand[0][1] >= 2:
+                #         self.data_buffer.append({"type": "hand", "value": top_hand[0][0], "time": current_time})
+                #     elif top_emotion and top_emotion[0][1] >= 3:
+                #         self.data_buffer.append({"type": "emotion", "value": top_emotion[0][0], "time": current_time})
 
-                if current_time - self.window_start_time >= 60 and self.data_buffer and not self.agent_mode:
+                #     self.emotion_counter.clear()
+                #     self.hand_counter.clear()
+
+                if current_time - self.window_start_time >= 30 and not self.agent_mode:
                     self.agent_mode = True
                     threading.Thread(target=self.run_agent_workflow, daemon=True).start()
 
