@@ -36,6 +36,7 @@ class FaceEmotionDetector:
     def run_agent_system(self, emotions):
         try:
             final_state = process_agent_system(emotions)
+            print("final state in face_detection :", final_state)
             if self.status_ui:
                 self.status_ui.update_status(
                     emotion=final_state.average_emotion,

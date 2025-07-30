@@ -3,6 +3,7 @@
 from PySide6.QtCore import QCoreApplication, QMetaObject, QRect, QSize, Qt, Signal, QPropertyAnimation
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget, QPushButton, QGroupBox)
+from PySide6.QtWidgets import QLineEdit, QPushButton
 
 class ClickableFrame(QFrame):
     clicked = Signal()
@@ -75,15 +76,13 @@ class InteraceMainwindow(object):
         # Set style with proper selector
         choice_frame.setStyleSheet(f"""
         #{choice_frame.objectName()} {{
-            background-color: rgba(85, 255, 255, 128);
+           
             border-radius: 15px;
             border: 2px solid rgb(0, 255, 255);
         }}
         #{choice_frame.objectName()}:hover {{
-            background-color: rgba(85, 255, 255, 200); /* Lighter on hover */
         }}
         #{choice_frame.objectName()}:pressed {{
-            background-color: rgba(85, 255, 255, 255); /* Darker when pressed */
         }}
         """)
         
@@ -149,7 +148,7 @@ class InteraceMainwindow(object):
 
         #Icon {
             background-color: rgba(87, 117, 201, 0.392);
-            border-image: url(res/Icon.jpg);
+            border-image: url(utils/res/Icon.jpg);
             border-radius: 15px;
         }
                                  
@@ -197,7 +196,7 @@ class InteraceMainwindow(object):
         self.Close_Btn.setGeometry(QRect(10, 30, 31, 21))
         self.Close_Btn.setAutoFillBackground(False)
         icon = QIcon()
-        icon.addFile(u"res/close.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon.addFile(u"utils/res/close.png", QSize(), QIcon.Normal, QIcon.Off)
         self.Close_Btn.setIcon(icon)
         self.Close_Btn.raise_()
 
@@ -237,13 +236,158 @@ class InteraceMainwindow(object):
         self.ChoiceFrame.raise_()
         self.Icon.raise_()
 
-        self.recommend_group.setVisible(False)
+        self.recommend_group.setVisible(True)
         MainWindow.setCentralWidget(self.centralwidget)
         self.retranslateUi(MainWindow)
         QMetaObject.connectSlotsByName(MainWindow)
+
+        
+        # Add search components (hidden by default)
+        self.search_frame = QFrame(self.MainFrame)
+        self.search_frame.setObjectName(u"SearchFrame")
+        self.search_frame.setGeometry(QRect(10, 49, 421, 100))
+        self.search_frame.setStyleSheet("""
+            QFrame {
+                background-color: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(239, 207, 207, 180),
+                    stop:1 rgba(200, 230, 255, 180)
+                );
+                border-radius: 15px;
+                border: 2px solid rgb(0, 180, 255);
+            }
+        """)
+        self.search_frame.hide()
+        
+        self.search_input = QLineEdit(self.search_frame)
+        self.search_input.setPlaceholderText("Enter search query...")
+        self.search_input.setGeometry(QRect(20, 20, 300, 30))
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: rgba(255, 255, 255, 200);
+                border-radius: 10px;
+                border: 1px solid rgb(0, 150, 255);
+                padding: 5px;
+                font-size: 12px;
+            }
+            QLineEdit:hover {
+                background-color: rgba(255, 255, 255, 230);
+                border: 1px solid rgb(0, 180, 255);
+            }
+            QLineEdit:focus {
+                background-color: rgba(255, 255, 255, 240);
+                border: 1px solid rgb(0, 200, 255);
+            }
+        """)
+        
+        self.search_button = QPushButton("Search", self.search_frame)
+        self.search_button.setGeometry(QRect(330, 20, 70, 30))
+        self.search_button.setStyleSheet("""
+            QPushButton {
+                background-color: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(100, 200, 255, 220),
+                    stop:1 rgba(50, 150, 255, 220)
+                );
+                border-radius: 10px;
+                border: 1px solid rgb(0, 150, 255);
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(120, 220, 255, 240),
+                    stop:1 rgba(70, 170, 255, 240)
+                );
+                border: 1px solid rgb(0, 180, 255);
+            }
+            QPushButton:pressed {
+                background-color: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(80, 180, 255, 240),
+                    stop:1 rgba(30, 130, 255, 240)
+                );
+                border: 1px solid rgb(0, 200, 255);
+                padding-top: 2px;
+                padding-left: 2px;
+            }
+        """)
+        self.search_button.clicked.connect(self.on_search_clicked)
+        
+        
+        self.cancel_button = QPushButton("Cancel", self.search_frame)
+        self.cancel_button.setGeometry(QRect(330, 60, 70, 30))
+        self.cancel_button.clicked.connect(self.on_cancel_clicked)
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 150, 150, 220),
+                    stop:1 rgba(255, 100, 100, 220)
+                );
+                border-radius: 10px;
+                border: 1px solid rgb(255, 100, 100);
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 170, 170, 240),
+                    stop:1 rgba(255, 120, 120, 240)
+                );
+                border: 1px solid rgb(255, 120, 120);
+            }
+            QPushButton:pressed {
+                background-color: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(255, 130, 130, 240),
+                    stop:1 rgba(255, 80, 80, 240)
+                );
+                border: 1px solid rgb(255, 140, 140);
+                padding-top: 2px;
+                padding-left: 2px;
+            }
+        """)
+
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
 
     def updateLayoutShow(self, Recommend_Group):
         self.recommend_group.setVisible(True)
+    
+    def show_search(self, search_type="youtube"):
+        """Show search frame with type-specific settings"""
+        self.search_frame.setVisible(True)
+        self.ChoiceFrame.setVisible(False)
+        
+        if search_type == "telegram":
+            self.search_input.setPlaceholderText("Enter Telegram username (e.g., @username)")
+            self.search_button.setText("Find User")
+        else:  # youtube
+            self.search_input.setPlaceholderText("Enter search query...")
+            self.search_button.setText("Search")
+
+    def on_search_clicked(self):
+        search_query = self.search_input.text()
+        # Emit signal or handle the search query
+        # If no query was entered, use the default from the selected choice
+        if not search_query:
+            if hasattr(self, 'selected_choice'):
+                search_query = self.selected_choice.get('search_query', '')
+        
+        # Determine which callback to use based on placeholder text
+        if "Telegram username" in self.search_input.placeholderText():
+            if hasattr(self, 'telegram_search_callback'):
+                self.telegram_search_callback(search_query)
+        else:
+            if hasattr(self, 'search_callback'):
+                self.search_callback(search_query)
+        self.show_search(False)
+
+    def on_cancel_clicked(self):
+        self.show_search(False)
+        if hasattr(self, 'search_callback'):
+            self.search_callback(None)

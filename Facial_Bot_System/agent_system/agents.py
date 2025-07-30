@@ -83,9 +83,15 @@ from utils.selection_window import selection_window
 from tools.recommender_tools import open_recommendation
 from utils.runner_interface import launch_window
 import requests
-import ollama
 import ctypes
 from collections import Counter
+import psutil
+from typing import Dict, List
+
+launched_apps = {}
+opened_browser_instances = []  # Track browser instances we launched
+opened_browser_tabs: List[Dict] = []  # Track individual tabs
+
 
 def average_emotion_agent(state):
     """Calculate most frequent emotion from AgentState model"""
@@ -155,7 +161,7 @@ def task_detection_agent(state):
             "Content-Type": "application/json"
         }
         response = requests.post(
-            "https://5a1b-192-248-50-253.ngrok-free.app/api/generate",
+            "https://087f647be26e.ngrok-free.app/api/generate",
             headers=headers,
             json={
                 "model": "llava:7b",
@@ -236,50 +242,22 @@ def recommendation_agent(state):
         User is looking for a way to improve mood.
 
         There are two outputs. 
-        - 'recommendation': says what to do to improve mood. Suggest one from:
-        ["Play music", "Watch funny videos", "Take a break", "Quick game", "Coding Bot", "Nothing"]
-        - 'recommendation_options': list of 3 apps to help. Each with app_name, app_url, search_query.
-        
-        Then the second output which is the recommendation_options are three out of Telegram Desktop, Discord, zoom 
-        or apps that can be run through a webrowser. For an example, Microsoft Solitaire Collection, facebook, whatsapp, inster, youtube, etc. The response formate should be as below.
-        Example response:
-        recommendation: Play music
+        - 'recommendation': Suggestion to improve the mood. Give the most suitable option from the list:-["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
+        - 'recommendation_options': list of 3 apps that is most suitable to accomplish the given recommendation. 
+        The recommendation_options should be apps from the list eg:-[ Discord, Spotify, Paint, Microsoft Teams, Telegram Desktop, Zoom, Youtube, Facebook, Instergram, Microsoft Solitaire Collection] or any other suitable. 
+        Response Formate:
+        recommendation: Chat with friends
         recommendation_options: [
-        (app_name: 'YouTube', text: 'Watch videos on chill lofi music', app_url: 'https://youtube.com', search_query: 'chill lofi music'),
-        (app_name: 'Spotify', text: 'Listen to music on relax playlist', app_url: 'https://open.spotify.com', search_query: 'relax playlist')
+        (app_name: 'name of the app', text: '3,4 word sentence saying the purpose of the app', app_url: 'https://xxxxxxx.com', search_query: 'If the app through web browser, give a suitable search query'),
+        (app_name: '', text: '', app_url: '', search_query: ''),
+        (app_name: '' , text: '', app_url: '', search_query: ''),
         ]
         Respond ONLY with the exact phrase from the list.
         """
 
-    # response = ollama.generate(
-    #     model="qwen3:4b",
-    #     prompt=prompt,
-    #     options={"temperature": 0.2}
-    # )
-    # response_text = response["response"]
-    # print("Recommendation is done.")
-    # print("[Agent] Raw LLM Response:", response_text)
-    
-    # try:
-    #     recommendation, recommendation_options = parse_llm_response(response_text)
-    # except Exception as e:
-    #     print("[Agent] Error parsing response:", e)
-    #     recommendation = "No action needed"
-    #     recommendation_options = []
-
-    # if not recommendation or not recommendation_options:
-    #     recommendation = "No action needed"
-    #     recommendation_options = []
-
-    # print(f"[Agent] Recommendation: {recommendation}, recommendation_options: {recommendation_options}")
-    # return {
-    #     "recommendation": recommendation,
-    #     "recommendation_options": recommendation_options
-    # }
-
     try:
         response = requests.post(
-            "https://5a1b-192-248-50-253.ngrok-free.app/api/generate",  # Use local endpoint
+            "https://087f647be26e.ngrok-free.app/api/generate",  # Use local endpoint
             headers={"Content-Type": "application/json"},
             json={
                 "model": "qwen3:4b",
@@ -301,10 +279,7 @@ def recommendation_agent(state):
         recommendation, recommendation_options = parse_llm_response(response_data.get('response', ''))
         
         # Validate response format
-        valid_recommendation = [
-            "Play music", "Watch funny videos", "Take a break", 
-            "Quick game", "Coding Bot", "Nothing"
-        ]
+        valid_recommendation = ["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
         
         if recommendation not in valid_recommendation:
             print(f"[Warning] Invalid recommendation: {recommendation}")
@@ -343,45 +318,27 @@ def task_execution_agent(state):
             app.exec()
             selected_option = window.selectedChoice
             window.close()
+            app.quit()
 
             print("selected option: ", selected_option)
             if selected_option:
                 start_time = time.time()
                 open_recommendation(selected_option) # Execute the task based on the option
+                print("Task is executed")
                 return {
                     "executed": True,
                     "action_time_start": start_time
                 }
                     
-    # send_blocking_message(
-    #     title="Emotion Assistant",
-    #     message=f"You seem {state.average_emotion}. Recommendation: {recommended_output}"
-    # )
-   
 def task_exit_agent(state):
-    executed_state = state.executed
-    start_time = state.action_time_start
+    task_executed = True
+    if not state.executed:
+        return {"executed": False, "action_time_start": None}
+    print("Thread is running")
+    while task_executed:
+        time.sleep(35)
+        task_executed = False
+    print("Thread is closed")
 
-    delay_time = 1 # delay before closing
-    closing_text = "Time to get back to work"
-
-    while executed_state:
-        elapsed = time.time() - start_time
-        if elapsed >= delay_time * 60:
-            status = send_notification(closing_text)
-            
-            if status:
-                print("Closing action....")
-                break
-            else:
-                start_time = time.time()
-                delay_time = 0.1
-        time.sleep(1)
-
-    return {
-        "executed": False,
-        "action_time_start": None
-    }
-
-
+    return {"executed": False, "action_time_start": None}
 
