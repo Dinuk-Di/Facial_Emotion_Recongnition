@@ -54,7 +54,7 @@ def open_dashboard(username):
     controller = AppController(log_queue=log_queue)
 
     def update_logs():
-        print("[GUI] Checking log queue...")  # debug
+        # print("[GUI] Checking log queue...")  # debug
         while not log_queue.empty():
             message = log_queue.get_nowait()
             log_textbox.configure(state="normal")

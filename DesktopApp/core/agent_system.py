@@ -58,9 +58,6 @@ def create_workflow():
     workflow.add_edge("exit_action", END)
     return workflow.compile()
 
-    
-
-
 def average_emotion_agent(state):
     """Calculate most frequent emotion from AgentState model"""
     if not state.emotions:
@@ -77,7 +74,7 @@ def clean_think_tags(text):
 
 def task_detection_agent(state):
     try:
-        if state.average_emotion == "neutral":
+        if state.average_emotion == "Neutral":
             print("[Agent] No task detection needed for neutral emotion.")
             return {"detected_task": "No Need to Detect Task"}
         # Capture screenshot as a base64 string (possibly with prefix)
@@ -280,7 +277,7 @@ def recommendation_agent(state):
         There are two outputs. 
         - 'recommendation': Suggestion to improve the mood. Give the most suitable option from the list:-["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
         - 'recommendation_options': list of 3 apps that is most suitable to accomplish the given recommendation. 
-        The recommendation_options should be apps from the list eg:-[ Discord, Spotify, Paint, Microsoft Teams, Telegram Desktop, Zoom, Youtube, Facebook, Instergram, Microsoft Solitaire Collection] or any other suitable. 
+        The recommendation_options should be apps from the list eg:-[ Discord, Spotify, Paint, Telegram Desktop, Zoom, Youtube, Microsoft Solitaire Collection] or any other suitable. 
         Response Formate:
         recommendation: Chat with friends
         recommendation_options: [
@@ -344,12 +341,11 @@ def send_blocking_message(title, message):
 def task_execution_agent(state):
     recommended_output = state.recommendation
     recommended_options = state.recommendation_options
-    
+    print("Recommended output: ", recommended_output)
     if "No action needed" not in recommended_output:
         status = send_notification(recommended_output)
         if status:
             #selected_option = selection_window(recommended_options)
-
             window, app = launch_window(recommended_options)
             app.exec()
             selected_option = window.selectedChoice

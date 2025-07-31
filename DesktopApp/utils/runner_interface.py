@@ -18,20 +18,20 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
 Icons_paths = [
-        {"app_name": "YouTube","icon_path": "utils/res/Youtube.png"},
-        {"app_name": "Spotify","icon_path": "utils/res/Spotify.png"},
-        {"app_name": "Discord","icon_path": "utils/res/Discord.png"},
-        {"app_name": "Zoom","icon_path": "utils/res/Zoom.png"},
-        {"app_name": "Microsoft Teams","icon_path": "utils/res/Teams.png"},
-        {"app_name": "Skype","icon_path": "utils/res/Skype.png"},
-        {"app_name": "Telegram Desktop","icon_path": "utils/res/Telegram.png"},
-        {"app_name": "WhatsApp","icon_path": "utils/res/Whatsapp.png"},
-        {"app_name": "Microsoft Solitaire Collection","icon_path": "utils/res/Solitaire.png"},
-        {"app_name": "Default","icon_path": "utils/res/default_app.png"},
+        {"app_name": "YouTube","icon_path": "assets/res/Youtube.png"},
+        {"app_name": "Spotify","icon_path": "assets/res/Spotify.png"},
+        {"app_name": "Discord","icon_path": "assets/res/Discord.png"},
+        {"app_name": "Zoom","icon_path": "assets/res/Zoom.png"},
+        {"app_name": "Microsoft Teams","icon_path": "assets/res/Teams.png"},
+        {"app_name": "Skype","icon_path": "assets/res/Skype.png"},
+        {"app_name": "Telegram Desktop","icon_path": "assets/res/Telegram.png"},
+        {"app_name": "WhatsApp","icon_path": "assets/res/Whatsapp.png"},
+        {"app_name": "Microsoft Solitaire Collection","icon_path": "assets/res/Solitaire.png"},
+        {"app_name": "Default","icon_path": "assets/res/default_app.png"},
     ]
 
 def setup_Icons(app_name, icon_paths):
-    default_icon = "utils/res/default_app.png"
+    default_icon = "assets/res/default_app.png"
     icon_path = default_icon
     
     for idx, icon in enumerate(icon_paths):
@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
 
         # Connect search callback
         self.ui.search_callback = self.handle_youtube_search
-        self.ui.telegram_search_callback = self.handle_telegram_search
+        # self.ui.telegram_search_callback = self.handle_telegram_search
         self.move(990, 580)
 
         for idx, choice in enumerate(choices[0:2]):
@@ -106,61 +106,68 @@ class MainWindow(QMainWindow):
             self.close()
     #def show_recommendations(self, show):
 
-    def handle_telegram_search(self, username):
-        if not username or not username.strip():
-            QMessageBox.warning(self, "Input Error", "Please enter a Telegram username")
-            return
+    # def handle_telegram_search(self, username):
+    #     if not username or not username.strip():
+    #         QMessageBox.warning(self, "Input Error", "Please enter a Telegram username")
+    #         return
         
-        username = username.lstrip('@')
+    #     username = username.lstrip('@')
 
-         # Show processing dialog
-        progress = QMessageBox(self)
-        progress.setWindowTitle("Searching")
-        progress.setText(f"Searching for @{username}...")
-        progress.setStandardButtons(QMessageBox.NoButton)
-        progress.show()
-        QApplication.processEvents()
+    #      # Show processing dialog
+    #     progress = QMessageBox(self)
+    #     progress.setWindowTitle("Searching")
+    #     progress.setText(f"Searching for @{username}...")
+    #     progress.setStandardButtons(QMessageBox.NoButton)
+    #     progress.show()
+    #     QApplication.processEvents()
         
-        try:
-            user_id = self.get_telegram_user_id(username)
-            if user_id:
-                # Process successful result
-                telegram_choice = next(
-                    (c for c in self.allchoices 
-                    if c.get('app_name', '').lower() == 'telegram desktop'),
-                    None
-                )
-                if telegram_choice:
-                    telegram_choice.update({
-                        'telegram_user_id': user_id,
-                        'telegram_username': f"@{username}",
-                        'app_url': f"https://t.me/{username}"
-                    })
-                    self.selectedChoice = telegram_choice
-        except Exception as e:
-            QMessageBox.critical(self, "Search Error", f"Failed to search user: {str(e)}")
-        finally:
-            progress.close()
-            self.close()
+    #     try:
+    #         user_id = self.get_telegram_user_id(username)
+    #         if user_id:
+    #             # Process successful result
+    #             telegram_choice = next(
+    #                 (c for c in self.allchoices 
+    #                 if c.get('app_name', '').lower() == 'telegram desktop'),
+    #                 None
+    #             )
+    #             if telegram_choice:
+    #                 telegram_choice.update({
+    #                     'telegram_user_id': user_id,
+    #                     'telegram_username': f"@{username}",
+    #                     'app_url': f"https://t.me/{username}"
+    #                 })
+    #                 self.selectedChoice = telegram_choice
+    #     except Exception as e:
+    #         QMessageBox.critical(self, "Search Error", f"Failed to search user: {str(e)}")
+    #     finally:
+    #         progress.close()
+    #         self.close()
 
+    # def configure_dpi_awareness(self):
+    #     """Multi-layered DPI awareness configuration"""
+    #     try:
+    #         # Windows API level (works on Windows 10 1607+)
+    #         ctypes.windll.shcore.SetProcessDpiAwareness(2)  # Per-monitor DPI aware
+    #     except:
+    #         try:
+    #             # Fallback for older Windows versions
+    #             ctypes.windll.user32.SetProcessDPIAware()
+    #         except:
+    #             pass
+        
+    #     # Qt level
+    #     os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
+    #     os.environ["QT_SCALE_FACTOR"] = "1"
+    #     os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+    #     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    #     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
     def configure_dpi_awareness(self):
-        """Multi-layered DPI awareness configuration"""
-        try:
-            # Windows API level (works on Windows 10 1607+)
-            ctypes.windll.shcore.SetProcessDpiAwareness(2)  # Per-monitor DPI aware
-        except:
-            try:
-                # Fallback for older Windows versions
-                ctypes.windll.user32.SetProcessDPIAware()
-            except:
-                pass
-        
-        # Qt level
+        """Safe DPI settings for Qt 6 (no low-level Windows API)"""
         os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
-        os.environ["QT_SCALE_FACTOR"] = "1"
         os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
 
     def setup_chrome_service(self):
         """Robust ChromeDriver setup with multiple fallbacks"""
