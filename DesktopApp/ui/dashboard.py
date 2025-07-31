@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from core.controller import AppController
-from database.db import get_connection
+from database.db import initialize_db
 from queue import Queue
 
 controller = None

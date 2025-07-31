@@ -13,7 +13,6 @@ icon_path = r'D:\RuhunaNew\Academic\Research\Facial_Recog_Repo\Group_50_Repo\Des
 executer_path = r'executer.pyw'
 
 def send_notification(recommendation,timeout=200):
-    event = threading.Event()
     user_action = False
     print(f"[notification] {recommendation}")
     

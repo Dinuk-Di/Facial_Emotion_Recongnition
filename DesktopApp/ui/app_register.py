@@ -7,8 +7,10 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 class AppRegister:
-    def __init__(self, root,username):
+    def __init__(self, root, username):
         self.root = root
+        self.username = username
+        
         self.root.title("Apps Settings")
         self.root.geometry("650x800")
 
@@ -22,6 +24,7 @@ class AppRegister:
         self.build_ui()
 
     def build_ui(self):
+        ctk.CTkLabel(self.main_frame, text="Configure Your Applications", font=("Arial", 20, "bold")).pack(pady=10)
         for category in self.categories:
             self.add_category_block(category)
 
@@ -67,11 +70,12 @@ class AppRegister:
     def open_add_app_popup(self, category, parent_frame):
         popup = ctk.CTkToplevel(self.root)
         popup.title("Add Application")
-        popup.geometry("400x350")
+        popup.geometry("400x450")
         popup.resizable(False, False)
 
         ctk.CTkLabel(popup, text=f"Add App to '{category}'", font=("Arial", 16, "bold")).pack(pady=10)
 
+        # App Name Entry
         ctk.CTkLabel(popup, text="App Name:").pack(anchor="w", padx=20)
         name_frame = ctk.CTkFrame(popup)
         name_frame.pack(pady=5)
@@ -91,6 +95,7 @@ class AppRegister:
         search_btn = ctk.CTkButton(name_frame, text="🔍", width=40, command=search_installed_apps)
         search_btn.pack(side="left")
 
+        # App Location Entry
         ctk.CTkLabel(popup, text="App Location:").pack(anchor="w", padx=20)
         location_frame = ctk.CTkFrame(popup)
         location_frame.pack(pady=5)
@@ -107,29 +112,29 @@ class AppRegister:
         browse_btn = ctk.CTkButton(location_frame, text="📁", width=40, command=browse_file)
         browse_btn.pack(side="left")
 
+        # Emotion Selection (Scrollable)
         ctk.CTkLabel(popup, text="Select Emotions:").pack(anchor="w", padx=20, pady=(10, 0))
-        emotion_frame = ctk.CTkFrame(popup)
-        emotion_frame.pack(padx=20, pady=5)
+
+        emotion_scroll_container = ctk.CTkFrame(popup)
+        emotion_scroll_container.pack(padx=20, pady=5, fill="x")
+
+        emotion_scroll_frame = ctk.CTkScrollableFrame(
+            emotion_scroll_container,
+            orientation="horizontal",
+            height=60,
+            corner_radius=5,
+            fg_color="transparent"
+        )
+        emotion_scroll_frame.pack(fill="x", expand=True)
 
         emotion_vars = []
         for emo in self.emotions:
             var = ctk.BooleanVar()
-            cb = ctk.CTkCheckBox(emotion_frame, text=emo, variable=var)
-            cb.pack(side="left", padx=3)
+            cb = ctk.CTkCheckBox(emotion_scroll_frame, text=emo, variable=var)
+            cb.pack(side="left", padx=5)
             emotion_vars.append((emo, var))
 
-        # # with out database add
-        # def save_app():
-        #     name = name_entry.get()
-        #     path = location_entry.get()
-        #     selected_emotions = [emo for emo, var in emotion_vars if var.get()]
-        #     if not name or not path or not selected_emotions:
-        #         messagebox.showwarning("Missing", "Fill in all fields and select at least one emotion.")
-        #         return
-        #     self.category_data[category]["apps"].append((name, path, selected_emotions))
-        #     popup.destroy()
-        #     self.update_app_list(category, parent_frame)
-
+    # Save App Button
         def save_app():
             name = name_entry.get()
             path_val = location_entry.get()
@@ -140,24 +145,19 @@ class AppRegister:
                 return
 
             is_local = bool(path_val)
-            app_url = None  # if you're not using a URL field
+            app_url = None
 
-            # Append to local UI state
             self.category_data[category]["apps"].append((name, path_val, selected_emotions))
-
-            # Get DB connection and call insert function
             conn = get_connection()
 
-
             try:
-                # find user_id from username
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM users WHERE username = ?", (self.username,))
                 user_id = cursor.fetchone()[0]
 
                 add_app_data(
                     conn=conn,
-                    user_id=user_id,  # You must store user_id in the class
+                    user_id=user_id,
                     category=category,
                     app_name=name,
                     app_url=app_url,
@@ -165,14 +165,18 @@ class AppRegister:
                     is_local=is_local,
                     selected_emotions=selected_emotions
                 )
+
                 messagebox.showinfo("Success", "App added successfully.")
                 popup.destroy()
+                self.update_app_list(category, parent_frame)
+
             except Exception as e:
                 messagebox.showerror("Database Error", f"Failed to add app: {e}")
                 print(f"[DB Error] {e}")
 
-
         ctk.CTkButton(popup, text="Add", command=save_app).pack(pady=15)
+
+
 
     def get_installed_programs(self):
         uninstall_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
@@ -180,17 +184,17 @@ class AppRegister:
         for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
             try:
                 with winreg.OpenKey(root, uninstall_key) as key:
-                    for i in range(0, winreg.QueryInfoKey(key)[0]):
-                        subkey_name = winreg.EnumKey(key, i)
-                        with winreg.OpenKey(key, subkey_name) as subkey:
-                            try:
-                                display_name = winreg.QueryValueEx(subkey, "DisplayName")[0]
-                                install_location = winreg.QueryValueEx(subkey, "InstallLocation")[0]
-                                program_paths.append((display_name, install_location))
-                            except FileNotFoundError:
-                                continue
+                        for i in range(0, winreg.QueryInfoKey(key)[0]):
+                            subkey_name = winreg.EnumKey(key, i)
+                            with winreg.OpenKey(key, subkey_name) as subkey:
+                                try:
+                                    display_name = winreg.QueryValueEx(subkey, "DisplayName")[0]
+                                    install_location = winreg.QueryValueEx(subkey, "InstallLocation")[0]
+                                    program_paths.append((display_name, install_location))
+                                except FileNotFoundError:
+                                    continue
             except FileNotFoundError:
-                continue
+                    continue
         return program_paths
 
     def submit(self):
@@ -198,9 +202,22 @@ class AppRegister:
         for category in self.categories:
             apps = self.category_data[category]["apps"]
             collected_data[category] = {"apps": apps}
-
         suggestion_freq = self.frequency.get()
         print("Collected Data:", collected_data)
         print("Suggestion Frequency:", suggestion_freq)
-
         messagebox.showinfo("Submitted", "Your preferences have been saved!")
+
+
+
+
+# # with out database add
+        # def save_app():
+        #     name = name_entry.get()
+        #     path = location_entry.get()
+        #     selected_emotions = [emo for emo, var in emotion_vars if var.get()]
+        #     if not name or not path or not selected_emotions:
+        #         messagebox.showwarning("Missing", "Fill in all fields and select at least one emotion.")
+        #         return
+        #     self.category_data[category]["apps"].append((name, path, selected_emotions))
+        #     popup.destroy()
+        #     self.update_app_list(category, parent_frame)

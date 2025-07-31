@@ -1,9 +1,10 @@
 # database/db.py
 import sqlite3
 import os
+from typing import List, Tuple
 DB_PATH = r"assets\app.db"
 
-def get_connection():
+def initialize_db():
     if not os.path.exists("assets"):
         os.makedirs("assets")
 
@@ -15,6 +16,11 @@ def get_connection():
     apps(conn)
     add_emotions(conn)
     return conn
+
+def get_connection():
+    if not os.path.exists(DB_PATH):
+        initialize_db()
+    return sqlite3.connect(DB_PATH)
 
 def create_users_table(conn):
     query = """
@@ -89,15 +95,15 @@ def apps(conn):
 # Add emotion function
 def add_emotions(conn):
     emotions_data = [
-        ("Angry", False),
-        ("Boaring", False),
-        ("Disgust", False),
-        ("Fear", False),
-        ("Happy", True),
-        ("Neutral", True),
-        ("Sad", False),
-        ("Stress", False),
-        ("Suprise", True),
+        ("ANGRY", False),
+        ("BOARING", False),
+        ("DISGUST", False),
+        ("FEAR", False),
+        ("HAPPY", True),
+        ("NEUTRAL", True),
+        ("SAD", False),
+        ("STRESS", False),
+        ("SURPRISE", True),
     ]
 
     cursor = conn.cursor()
@@ -120,7 +126,9 @@ def add_app_data(conn, user_id, category, app_name, app_url, path, is_local, sel
     """
 
     cursor = conn.cursor()
-    
+    if path and not path.endswith("\\"):
+        path += "\\"
+    path += app_name + ".exe"
     # Fetch emotion_id for each emotion name
     emotion_ids = []
     for emotion in selected_emotions:
@@ -139,5 +147,31 @@ def add_app_data(conn, user_id, category, app_name, app_url, path, is_local, sel
         """, (emotion_id, user_id, category, app_name, app_url, path, is_local))
 
     conn.commit()
+def get_apps_by_emotion(conn, emotion: str) -> List[Tuple]:
+    """
+    Fetches apps associated with a specific emotion.
+
+    :param conn: SQLite connection
+    :param emotion: Emotion name
+    :return: List of app entries (tuples)
+    """
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT a.id, a.category, a.app_name, a.app_url, a.path, a.is_local
+        FROM apps a
+        JOIN emotions e ON a.emotion_id = e.id
+        WHERE e.emotion = ?
+    """, (emotion,))
+    all_data = cursor.fetchall()
+    # get name, category and path only
+    filtered_data = [(row[2], row[1], row[4]) for row in all_data]
+    return filtered_data
 
 
+# main 
+if __name__ == "__main__":
+    conn = get_connection()
+    apps_list = get_apps_by_emotion(conn, "Stress")
+    for app in apps_list:
+        print(app)
+    conn.close()

@@ -6,15 +6,16 @@ import time
 from langgraph.graph import StateGraph, END
 import requests
 from utils.desktop import capture_desktop
-from utils.notifications import send_notification, execute_task
+from DesktopApp.old_utils.notifications import send_notification, execute_task
 import ollama
 import ctypes
 from collections import Counter
 from typing import List, Optional
 from pydantic import BaseModel
 from core.recommender_tools import open_recommendation
-from utils.runner_interface import launch_window
-from utils.notifications import send_notification
+from old_utils.runner_interface import launch_window
+from DesktopApp.old_utils.notifications import send_notification
+from database.db import get_apps_by_emotion, get_connection
 
 
 def run_agent_system(emotions):
@@ -268,7 +269,13 @@ def recommendation_agent(state):
     if emotion in negative_emotions:
         print(f"[Agent]{emotion}")  
 
-    print("Prompt creation...")
+    # get available apps from database
+    conn = get_connection()
+    if not conn:    
+        print("[Agent] Failed to connect to the database.")
+        return {"recommendation": "No action needed", "recommendation_options": []}
+    print(f"[Agent] Fetching apps for emotion: {emotion}")
+    available_apps = get_apps_by_emotion(conn, emotion.capitalize())
 
     prompt = f"""
         User is feeling {emotion} and is currently working on the screen task: {detected_task}.
@@ -346,7 +353,7 @@ def task_execution_agent(state):
         status = send_notification(recommended_output)
         if status:
             #selected_option = selection_window(recommended_options)
-            window, app = launch_window(recommended_options)
+            window, app = launch_window(recommended_options)  # implement suggestions tray simple ui as a drawer from right corner
             app.exec()
             selected_option = window.selectedChoice
             window.close()

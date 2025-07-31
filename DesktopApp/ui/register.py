@@ -63,7 +63,7 @@
 
 import customtkinter as ctk
 from tkinter import messagebox
-from database.db import get_connection
+from database.db import initialize_db
 from ui.login import LoginWindow
 import uuid
 import subprocess  # To call app_register.py
@@ -119,7 +119,7 @@ class RegisterWindow:
             messagebox.showwarning("Warning", "Please fill in all fields.")
             return
 
-        conn = get_connection()
+        conn = initialize_db()
         try:
             conn.execute(
                 "INSERT INTO users (username, phonenumber, birthday, session_id) VALUES (?, ?, ?, ?)",
