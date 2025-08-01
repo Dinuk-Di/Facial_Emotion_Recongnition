@@ -14,7 +14,7 @@ def initialize_db():
     recommendation_history(conn)
     emotions(conn)
     apps(conn)
-    # add_emotions(conn)
+    add_emotions(conn)
     return conn
 
 def get_connection():
@@ -91,7 +91,7 @@ def apps(conn):
     conn.execute(query)
     conn.commit()
 
-    
+
 # Add emotion function
 def add_emotions(conn):
     emotions_data = [

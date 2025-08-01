@@ -4,6 +4,7 @@ import winreg
 from database.db import get_connection, add_app_data
 import os
 from PIL import Image, ImageDraw
+from ui.dashboard import open_dashboard
 
 ASSET_PATH = "assets/res"
 
@@ -18,7 +19,7 @@ class AppRegister:
         self.root.title("Apps Settings")
         self.root.geometry("650x800")
 
-        self.emotions = ["Happy", "Neutral", "Fear", "Sad", "Angry", "Boring", "Stress", "Disgust", "Surprise"]
+        self.emotions = ["Fear", "Sad", "Angry", "Boring", "Stress", "Disgust"]
         self.categories = ["Songs", "Entertainment", "SocialMedia", "Games", "Communication", "Help", "Other"]
         self.category_data = {}
 
@@ -274,7 +275,10 @@ class AppRegister:
         suggestion_freq = self.frequency.get()
         print("Collected Data:", collected_data)
         print("Suggestion Frequency:", suggestion_freq)
+        
         messagebox.showinfo("Submitted", "Your preferences have been saved!")
+        self.root.destroy()
+        open_dashboard(self.username)
 
 
 

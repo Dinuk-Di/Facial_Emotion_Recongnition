@@ -68,13 +68,15 @@ def average_emotion_agent(state):
     print(f"[Agent] Average emotion: {most_common}")
     return {"average_emotion": most_common}
 
+# Remove reasoning tags from the response
 def clean_think_tags(text):
     cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     return cleaned_text.strip()
 
+
 def task_detection_agent(state):
     try:
-        if state.average_emotion == "Neutral":
+        if state.average_emotion == "Neutral" or state.average_emotion == "Happy" or state.average_emotion == "Surprise":
             print("[Agent] No task detection needed for neutral emotion.")
             return {"detected_task": "No Need to Detect Task"}
         # Capture screenshot as a base64 string (possibly with prefix)
@@ -274,23 +276,33 @@ def recommendation_agent(state):
         print("[Agent] Failed to connect to the database.")
         return {"recommendation": "No action needed", "recommendation_options": []}
     print(f"[Agent] Fetching apps for emotion: {emotion}")
-    available_apps = get_apps_by_emotion(conn, emotion.capitalize())
+    available_apps = get_apps_by_emotion(conn, emotion)
 
     prompt = f"""
         User is feeling {emotion} and is currently working on the screen task: {detected_task}.
         User is looking for a way to improve mood.
 
+        Here are the locally installed apps and their paths that can help:
+        {available_apps}
+
         There are two outputs. 
-        - 'recommendation': Suggestion to improve the mood. Give the most suitable option from the list:-["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
-        - 'recommendation_options': list of 3 apps that is most suitable to accomplish the given recommendation. 
-        The recommendation_options should be apps from the list eg:-[ Discord, Spotify, Paint, Telegram Desktop, Zoom, Youtube, Microsoft Solitaire Collection] or any other suitable. 
+        - 'recommendation': Suggestion to improve the mood. Give the most suitable 3 recommandations each containing 4 words, according to the selected apps and online available apps(like youtube, spotify, online games like free sites). 
+        - 'recommendation_options': list of 2 apps that are available locally or online.
+        The recommendation_options should be apps. It contains 3 parameters:
+        - app_name: Name of the app
+        - app_url: URL of the app ('https://xxxxxxx.com') or path of the app from above available_apps
+        - search_query: If the app is a web browser, give a suitable search query to find the app.
         Response Formate:
-        recommendation: Chat with friends
-        recommendation_options: [
-        (app_name: 'name of the app', text: '3,4 word sentence saying the purpose of the app', app_url: 'https://xxxxxxx.com', search_query: 'If the app through web browser, give a suitable search query'),
-        (app_name: '', text: '', app_url: '', search_query: ''),
-        (app_name: '' , text: '', app_url: '', search_query: ''),
-        ]
+        [
+            {
+                "recommendation": "",
+                "recommendation_options": [{
+                    "app_name": "",
+                    "app_url": "",
+                    "search_query": ""
+                }],
+                
+            }]
         Respond ONLY with the exact phrase from the list.
         """
 
