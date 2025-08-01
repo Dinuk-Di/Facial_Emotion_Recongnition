@@ -1,6 +1,6 @@
 import ctypes
 import sys
-from DesktopApp.old_utils.mainWindowInterface import InteraceMainwindow
+from old_utils.mainWindowInterface import InteraceMainwindow
 import os
 import sys
 import time

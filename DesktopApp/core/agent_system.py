@@ -6,7 +6,7 @@ import time
 from langgraph.graph import StateGraph, END
 import requests
 from utils.desktop import capture_desktop
-from DesktopApp.old_utils.notifications import send_notification, execute_task
+from ui.notification import send_notification, execute_task
 import ollama
 import ctypes
 from collections import Counter
@@ -14,7 +14,6 @@ from typing import List, Optional
 from pydantic import BaseModel
 from core.recommender_tools import open_recommendation
 from old_utils.runner_interface import launch_window
-from DesktopApp.old_utils.notifications import send_notification
 from database.db import get_apps_by_emotion, get_connection
 
 
@@ -350,7 +349,7 @@ def task_execution_agent(state):
     recommended_options = state.recommendation_options
     print("Recommended output: ", recommended_output)
     if "No action needed" not in recommended_output:
-        status = send_notification(recommended_output)
+        status = send_notification("Recommendations by EMOFI", recommended_output)
         if status:
             #selected_option = selection_window(recommended_options)
             window, app = launch_window(recommended_options)  # implement suggestions tray simple ui as a drawer from right corner

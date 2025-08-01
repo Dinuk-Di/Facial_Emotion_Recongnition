@@ -12,44 +12,52 @@ import threading
 icon_path = r'D:\RuhunaNew\Academic\Research\Facial_Recog_Repo\Group_50_Repo\DesktopApp\assets\res\Icon.jpg'
 executer_path = r'executer.pyw'
 
-def send_notification(recommendation,timeout=200):
-    user_action = False
-    print(f"[notification] {recommendation}")
-    
+import tkinter as tk
+import os
+import ctypes
 
-    if not os.path.exists(icon_path):
-        print(f"Warning: Icon file not found at {icon_path}")
-        icon = None
-    else:
-        icon = {
-        'src': icon_path,
-        'placement': 'appLogoOverride'
-        }
+def send_notification(title, recommendations, timeout=None):
+    user_choice = {"value": None}
 
-    def on_click(*args):
-        try:
-            #subprocess.Popen(["pythonw", executer_path], shell=True)
-            nonlocal user_action
-            user_action = True
-            event.set()
-        except Exception as e:
-            print(f"Error executing script: {e}")
+    def on_click(rec):
+        user_choice["value"] = rec
+        root.destroy()
 
-    # def on_click():
-    #     try:
-    #         print("Clicked")
-    #     except Exception as e:
-    #         print(f"Error executing script: {e}")
+    # Create the main window
+    root = tk.Tk()
+    root.title(title)
+    root.overrideredirect(True)  # Remove window border
+    root.attributes("-topmost", True)
+    root.configure(bg="#2b2b2b")
 
-    try:
-        toast('Emotion Recognition Test ', str(recommendation) , icon=icon,  app_id="EMOFI", on_click=on_click, button='Dismiss')
-        print("notification sent")
-    except Exception as e:
-        print(f"Error sending notification: {e}")
+    # Set window size and position
+    width, height = 300, 200
+    x = root.winfo_screenwidth() - width - 20
+    y = 50
+    root.geometry(f"{width}x{height}+{x}+{y}")
 
+    # Frame for styling
+    frame = tk.Frame(root, bg="#2b2b2b", bd=2)
+    frame.place(relwidth=1, relheight=1)
 
-    event.wait(timeout)
-    return user_action
+    # Title
+    tk.Label(frame, text=title, bg="#2b2b2b", fg="white", font=("Segoe UI", 12, "bold")).pack(pady=(10, 5))
+
+    # Instructions
+    tk.Label(frame, text="Choose an option:", bg="#2b2b2b", fg="white", font=("Segoe UI", 10)).pack(pady=(0, 10))
+
+    # Buttons
+    for rec in recommendations:
+        btn = tk.Button(frame, text=rec, width=25, bg="#3c3f41", fg="white", font=("Segoe UI", 9),
+                        relief="flat", highlightthickness=0, command=lambda r=rec: on_click(r))
+        btn.pack(pady=3)
+
+    # Optional timeout
+    if timeout:
+        root.after(timeout, root.destroy)
+
+    root.mainloop()
+    return user_choice["value"]
 
 
 def execute_task(option):

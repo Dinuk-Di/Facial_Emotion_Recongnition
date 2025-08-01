@@ -9,7 +9,7 @@ import winapps
 from dotenv import load_dotenv
 from typing import Optional,Dict, List
 import webbrowser
-from utils.contactWindowInterface import ContactWindowInterface
+from old_utils.contactWindowInterface import ContactWindowInterface
 import uuid
 from PySide6.QtWidgets import QApplication, QMessageBox
 from core.app_config import kNOWN_APPS_LIST
@@ -29,7 +29,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from DesktopApp.old_utils.notifications import send_notification
+from old_utils.notifications import send_notification
 
 import time
 import threading
