@@ -2,6 +2,10 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import winreg
 from database.db import get_connection, add_app_data
+import os
+from PIL import Image, ImageDraw
+
+ASSET_PATH = "assets/res"
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -14,7 +18,7 @@ class AppRegister:
         self.root.title("Apps Settings")
         self.root.geometry("650x800")
 
-        self.emotions = ["Happy", "Neutral", "Fear", "Sad", "Angry", "Boaring", "Stress", "Disgust", "Suprise"]
+        self.emotions = ["Happy", "Neutral", "Fear", "Sad", "Angry", "Boring", "Stress", "Disgust", "Surprise"]
         self.categories = ["Songs", "Entertainment", "SocialMedia", "Games", "Communication", "Help", "Other"]
         self.category_data = {}
 
@@ -44,28 +48,93 @@ class AppRegister:
         block = ctk.CTkFrame(self.main_frame, border_width=1, corner_radius=10)
         block.pack(pady=10, fill="x", padx=5)
 
-        ctk.CTkLabel(block, text=category, font=("Arial", 16, "bold")).pack(anchor="w", padx=10, pady=(10, 5))
+        header_frame = ctk.CTkFrame(block, fg_color="transparent")
+        header_frame.pack(fill="x", padx=10, pady=(10, 5))
 
-        self.category_data[category] = {"apps": []}
+        ctk.CTkLabel(header_frame, text=category, font=("Arial", 16, "bold")).pack(side="left")
 
-        self.update_app_list(category, block)
+        add_button = ctk.CTkButton(header_frame, text="+", width=30, height=30, corner_radius=15,
+                                font=("Arial", 20, "bold"),
+                                command=lambda c=category: self.open_add_app_popup(c, block))
+        add_button.pack(side="left", padx=(10, 0))
 
-        add_button = ctk.CTkButton(block, text="+", width=30, height=30, corner_radius=15,
-                                   font=("Arial", 20, "bold"),
-                                   command=lambda c=category: self.open_add_app_popup(c, block))
-        add_button.pack(pady=10)
+        # Horizontal container for app icons
+        app_icon_frame = ctk.CTkFrame(block, fg_color="transparent")
+        app_icon_frame.pack(fill="x", padx=10, pady=(5, 10))
+
+        self.category_data[category] = {
+            "apps": [],
+            "app_icon_frame": app_icon_frame,
+            "app_widgets": []
+        }
+    
+    def load_app_icon(self, app_name):
+        filename = f"{app_name.lower().replace(' ', '')}.png"
+        path = os.path.join(ASSET_PATH, filename)
+        fallback_path = os.path.join(ASSET_PATH, "Other.png")
+
+        try:
+            img = Image.open(path)
+        except FileNotFoundError:
+            img = Image.open(fallback_path)
+
+        img = img.resize((50, 50)).convert("RGBA")
+        mask = Image.new("L", img.size, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((0, 0, img.size[0], img.size[1]), fill=255)
+        img.putalpha(mask)
+        return ctk.CTkImage(light_image=img, size=(50, 50))
+
+    def confirm_delete_app(self, category, index, parent_frame):
+        confirm = messagebox.askyesno("Delete App", "Are you sure you want to remove this app?")
+        if confirm:
+            del self.category_data[category]["apps"][index]
+            self.update_app_list(category, parent_frame)
+
 
     def update_app_list(self, category, parent_frame):
-        if "app_labels" in self.category_data[category]:
-            for label in self.category_data[category]["app_labels"]:
-                label.destroy()
+        # Clear existing widgets
+        for widget in self.category_data[category]["app_widgets"]:
+            widget.destroy()
+        self.category_data[category]["app_widgets"] = []
 
-        self.category_data[category]["app_labels"] = []
+        frame = self.category_data[category]["app_icon_frame"]
 
-        for name, _, _ in self.category_data[category]["apps"]:
-            label = ctk.CTkLabel(parent_frame, text=f"\u2022 {name}", anchor="w")
-            label.pack(anchor="w", padx=20)
-            self.category_data[category]["app_labels"].append(label)
+        for index, (name, path_val, selected_emotions) in enumerate(self.category_data[category]["apps"]):
+            icon_image = self.load_app_icon(name)
+
+            app_frame = ctk.CTkFrame(frame, fg_color="transparent", width=80, height=100)
+            app_frame.pack(side="left", padx=8, pady=5)
+
+            # Icon container to position delete button over it
+            icon_container = ctk.CTkFrame(app_frame, fg_color="transparent", width=60, height=60)
+            icon_container.pack()
+            icon_container.pack_propagate(False)
+
+            icon_label = ctk.CTkLabel(icon_container, text="", image=icon_image)
+            icon_label.image = icon_image
+            icon_label.pack()
+
+            # Position tiny delete button bottom right inside icon_container
+            delete_btn = ctk.CTkButton(
+                icon_container,
+                text="✖",
+                width=15,
+                height=15,
+                fg_color="red",
+                hover_color="#aa0000",
+                font=("Arial", 10),
+                command=lambda idx=index: self.confirm_delete_app(category, idx, parent_frame)
+            )
+            delete_btn.place(relx=1.0, rely=1.0, anchor="se", x=-2, y=-2)
+
+            name_label = ctk.CTkLabel(app_frame, text=name, font=("Arial", 10), wraplength=70)
+            name_label.pack(pady=(4, 0))
+
+            self.category_data[category]["app_widgets"].append(app_frame)
+
+
+
 
     def open_add_app_popup(self, category, parent_frame):
         popup = ctk.CTkToplevel(self.root)
@@ -206,7 +275,6 @@ class AppRegister:
         print("Collected Data:", collected_data)
         print("Suggestion Frequency:", suggestion_freq)
         messagebox.showinfo("Submitted", "Your preferences have been saved!")
-
 
 
 
