@@ -75,13 +75,25 @@
 import base64
 from collections import Counter
 import re
-
 import requests
+import json
+import time
+
 from utils.desktop import capture_desktop
 from utils.notifications import send_notification, execute_task
-import ollama
+from utils.selection_window import selection_window
+from tools.recommender_tools import open_recommendation
+from utils.runner_interface import launch_window
+import requests
 import ctypes
 from collections import Counter
+import psutil
+from typing import Dict, List
+
+launched_apps = {}
+opened_browser_instances = []  # Track browser instances we launched
+opened_browser_tabs: List[Dict] = []  # Track individual tabs
+
 
 def average_emotion_agent(state):
     """Calculate most frequent emotion from AgentState model"""
@@ -93,9 +105,33 @@ def average_emotion_agent(state):
     print(f"[Agent] Average emotion: {most_common}")
     return {"average_emotion": most_common}
 
-def clean_think_tags(text):
-    cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    return cleaned_text.strip()
+def parse_llm_response(text):
+    try:
+        # Clean <think> tags if present
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+
+        # Extract recommendation
+        rec_match = re.search(r'recommendation:\s*(.+)', text)
+        recommendation = rec_match.group(1).strip() if rec_match else None
+
+        # Extract recommendation_options (raw list inside [])
+        options_match = re.search(r'recommendation_options:\s*\[(.*)\]', text, re.DOTALL)
+        options_raw = options_match.group(1).strip() if options_match else ""
+
+        # Convert (app_name: 'X', ...) → {"app_name": "X", ...}
+        options = []
+        for option_text in re.findall(r'\((.*?)\)', options_raw, re.DOTALL):
+            entry = {}
+            for kv in option_text.split(','):
+                key, val = kv.split(':', 1)
+                entry[key.strip()] = val.strip().strip("'\"")
+            options.append(entry)
+
+        return recommendation, options
+
+    except Exception as e:
+        print("[Agent] Error parsing LLM response block:", e)
+        return None, []
 
 def task_detection_agent(state):
     try:
@@ -128,6 +164,7 @@ def task_detection_agent(state):
         }
         response = requests.post(
             "https://0719f8d4bb96.ngrok-free.app/api/generate",
+
             headers=headers,
             json={
                 "model": "llava:7b",
@@ -152,6 +189,31 @@ def task_detection_agent(state):
     except Exception as e:
         print(f"Error detecting task: {str(e)}")
         return {"detected_task": "unknown"}
+
+    # prompt = f"""
+    # User is feeling {emotion} and is currently working on the screen task: {detected_task}.
+    # User is looking for a way to improve mood.
+    
+    # Suggest one concrete action to improve mood from this list. Try to give listning music and Watch funny videos as a priority:
+    # - Play music
+    # - Watch funny videos
+    # - Take a break
+    # - Quick game
+    # - If the user is working on a coding task and seems to need a help, then output "Coding Bot"
+    # - Nothing
+    # Respond ONLY with the exact phrase from the list.
+    # """
+
+    # response = ollama.generate(
+    #     model="qwen3:4b",
+    #     prompt=prompt,
+    #     options={"temperature": 0.2}
+    # )
+    # recommendation = clean_think_tags(response['response'].strip())
+    # if not recommendation:
+    #     recommendation = "No action needed"
+    # print(f"[Agent] Recommendation: {recommendation}")
+    # return {"recommendation": recommendation}
     
 # def recommendation_agent(state):
 #     if "No Need to Detect Task" in state.detected_task or not state.detected_task:
@@ -203,19 +265,30 @@ def task_detection_agent(state):
 #     return {"recommendation": recommendation}
 def recommendation_agent(state):
     # Early exit if no task detected
+
     if "No Need to Detect Task" in state.detected_task or not state.detected_task:
         print("[Agent] No task detected, skipping recommendation.")
         return {"recommendation": "No action needed"}
     
     emotion = state.average_emotion.lower()
-    detected_task = state.detected_task.lower() if state.detected_task else "unknown"
+    detected_task = state.detected_task
     print(f"[Agent] Calculating recommendation for emotion: {emotion} and task: {detected_task}")
-    
     negative_emotions = ["angry", "sad", "fear", "disgust", "stress", "boring"]
     
     # Exit if not negative emotion
+
     if emotion not in negative_emotions:
-        return {"recommendation": "No action needed"}
+        print("You are in a good mood")
+        return {
+            "recommendation": "No action needed",
+            "recommendation_options": []
+        }
+
+    print("⚠️ Since the emotion is a negative one. Let's proceede next steps.")
+    if emotion in negative_emotions:
+        print(f"[Agent]{emotion}")  
+
+    print("Prompt creation...")
 
     prompt = f"""
         User is feeling {emotion} and is currently working on: {detected_task}.
@@ -271,6 +344,50 @@ def recommendation_agent(state):
         print(f"Error generating recommendation: {str(e)}")
         return {"recommendation": "No action needed"}
 
+    try:
+        response = requests.post(
+            "https://087f647be26e.ngrok-free.app/api/generate",  # Use local endpoint
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": "qwen3:4b",
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.2},
+                
+            }
+        )
+        
+        # Handle HTTP errors
+        if response.status_code != 200:
+            print(f"API error ({response.status_code}): {response.text[:100]}...")
+            return {"recommendation": "No action needed"}
+            
+        response_data = response.json()
+        print("Response from Ollama:", response_data)
+        # Clean response from <think> tags if present
+        recommendation, recommendation_options = parse_llm_response(response_data.get('response', ''))
+        
+        # Validate response format
+        valid_recommendation = ["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
+        
+        if recommendation not in valid_recommendation:
+            print(f"[Warning] Invalid recommendation: {recommendation}")
+            recommendation = "No action needed"
+        
+        # Store in state
+        state.recommendation = recommendation
+        state.recommendation_options = recommendation_options
+        print(f"Recommendation: {recommendation}")
+        print(f"Recommendation options: {recommendation_options}")
+        return {
+            "recommendation": recommendation,
+            "recommendation_options": recommendation_options
+        }
+        
+    except Exception as e:
+        print("[Agent] Error parsing response:", e)
+        recommendation = "No action needed"
+        recommendation_options = []
 
 
 def send_blocking_message(title, message):
@@ -278,16 +395,39 @@ def send_blocking_message(title, message):
     ctypes.windll.user32.MessageBoxW(0, message, title, MB_OK)
 
 def task_execution_agent(state):
-    recommendation = state.recommendation
-    if "No action" in recommendation:
-        return {"executed": False}
+    recommended_output = state.recommendation
+    recommended_options = state.recommendation_options
+    
+    if "No action needed" not in recommended_output:
+        status = send_notification(recommended_output)
+        if status:
+            #selected_option = selection_window(recommended_options)
 
-    send_blocking_message(
-        title="Emotion Assistant",
-        message=f"You seem {state.average_emotion}. Recommendation: {recommendation}"
-    )
-    # This line runs only after user presses OK in the message box
-    execute_task(recommendation)
-    return {"executed": True}
+            window, app = launch_window(recommended_options)
+            app.exec()
+            selected_option = window.selectedChoice
+            window.close()
+            app.quit()
 
+            print("selected option: ", selected_option)
+            if selected_option:
+                start_time = time.time()
+                open_recommendation(selected_option) # Execute the task based on the option
+                print("Task is executed")
+                return {
+                    "executed": True,
+                    "action_time_start": start_time
+                }
+                    
+def task_exit_agent(state):
+    task_executed = True
+    if not state.executed:
+        return {"executed": False, "action_time_start": None}
+    print("Thread is running")
+    while task_executed:
+        time.sleep(35)
+        task_executed = False
+    print("Thread is closed")
+
+    return {"executed": False, "action_time_start": None}
 

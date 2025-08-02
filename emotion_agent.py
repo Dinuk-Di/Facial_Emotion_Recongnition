@@ -1,6 +1,6 @@
 from langchain.agents import initialize_agent, AgentType
 from llm_setup import llm
-from tools.recommender_tools import tools
+from Facial_Bot_System.tools.recommender_tools import tools
 
 agent = initialize_agent(
     tools=tools,

@@ -7,3 +7,9 @@ langgraph
 ollama
 pywin32
 pystray
+
+PySide6>=6.4.0
+selenium>=4.0.0
+webdriver-manager>=3.8.0
+python-dotenv>=0.19.0
+pywin32>=300
