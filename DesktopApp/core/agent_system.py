@@ -17,6 +17,7 @@ from old_utils.runner_interface import launch_window
 from database.db import get_apps_by_emotion, get_connection
 from dotenv import load_dotenv
 import os
+import json
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -38,24 +39,31 @@ def run_agent_system(emotions):
     agent_workflow = create_workflow()
     return agent_workflow.invoke(initial_state)
 
-class AgentState(BaseModel):
-    emotions: List[str]
-    average_emotion: Optional[str]
-    detected_task: Optional[str]
-    recommendation: Optional[str]
-    recommendation_options: Optional[List[Dict[str,str]]] # type: ignore
-    executed: Optional[bool]
-    action_executed: Optional[str]
-    action_time_start: Optional[float]
-
 class AppRecommendation(BaseModel):
     app_name: str = Field(description="Name of recommended application")
     app_url: str = Field(description="URL or local path of the application")
     search_query: str = Field(description="Search query if web-based application")
+    is_local: bool = Field(default=False, description="Whether the app is a local executable")
+
+
+class AgentState(BaseModel):
+    emotions: List[str]
+    average_emotion: Optional[str]
+    detected_task: Optional[str]
+    recommendation: Optional[List[str]]  # list of suggestions
+    recommendation_options: Optional[List[List[AppRecommendation]]]
+    executed: Optional[bool]
+    action_executed: Optional[str]
+    action_time_start: Optional[float]
+
 
 class RecommendationResponse(BaseModel):
-    recommendations: List[str] = Field(description="Three 4-word mood improvement suggestions")
+    recommendation: List[str] = Field(description="4-word mood improvement suggestions")
     recommendation_options: List[AppRecommendation] = Field(description="Two app recommendations")
+
+class RecommendationList(BaseModel):
+    listofRecommendations: List[RecommendationResponse] = Field(description="List of 3 recommendations with options")
+    
 
 
 
@@ -120,7 +128,7 @@ def task_detection_agent(state):
             "Content-Type": "application/json"
         }
         response = requests.post(
-            "https://087f647be26e.ngrok-free.app/api/generate",
+            "https://fa7a43f295fa.ngrok-free.app/api/generate",
             headers=headers,
             json={
                 "model": "llava:7b",
@@ -264,125 +272,130 @@ def parse_llm_response(text):
         return None, []
 
 def recommendation_agent(state):
-
     if "No Need to Detect Task" in state.detected_task or not state.detected_task:
         print("[Agent] No task detected, skipping recommendation.")
-        return {"recommendation": "No action needed"}
-    
-    emotion = state.average_emotion.lower()
+        return {"recommendation": "No action needed", "recommendation_options": []}
+
+    emotion = state.average_emotion
     detected_task = state.detected_task
     print(f"[Agent] Calculating recommendation for emotion: {emotion} and task: {detected_task}")
 
-    negative_emotions = ["angry", "sad", "fear", "disgust", "stress","boring"]
+    negative_emotions = ["Angry", "Sad", "Fear", "Disgust", "Stress", "Boring"]
 
     if emotion not in negative_emotions:
         print("You are in a good mood")
-        return {
-            "recommendation": "No action needed",
-            "recommendation_options": []
-        }
+        return {"recommendation": "No action needed", "recommendation_options": []}
 
-    print("⚠️ Since the emotion is a negative one. Let's proceede next steps.")
-    if emotion in negative_emotions:
-        print(f"[Agent]{emotion}")  
-
-    # get available apps from database
     conn = get_connection()
-    if not conn:    
+    if not conn:
         print("[Agent] Failed to connect to the database.")
         return {"recommendation": "No action needed", "recommendation_options": []}
-    print(f"[Agent] Fetching apps for emotion: {emotion}")
+
     available_apps = get_apps_by_emotion(conn, emotion)
+    print("Available Apps", available_apps)
 
     prompt = f"""
         User is feeling {emotion} and is currently working on the screen task: {detected_task}.
         User is looking for a way to improve mood.
 
-        Here are the locally installed apps and their paths that can help:
+        Here are the locally installed apps with category, app name and their path:
         {available_apps}
 
-        There are two outputs. 
-        - 'recommendation': Suggestion to improve the mood. Give the most suitable 3 recommandations each containing 4 words, according to the selected apps and online available apps(like youtube, spotify, online games like free sites). 
-        - 'recommendation_options': list of 2 apps that are available locally or online.
-        The recommendation_options should be apps. It contains 3 parameters:
-        - app_name: Name of the app
-        - app_url: URL of the app ('https://xxxxxxx.com') or path of the app from above available_apps
-        - search_query: If the app is a web browser, give a suitable search query to find the app.
-        Return a response in the following JSON format ONLY. No explanations.
-                '''{{
-                "recommendations": ["<first suggestion>", "<second suggestion>", "<third suggestion>"],
+        Output must be ONLY valid JSON. No text, no explanation, no tags and correct key value pairs. When selecting apps, consider:
+        1. If the app is a web-based application, use the URL.
+        2. If the app is a desktop application, use the path to the executable.
+        3. Check the app's is matching for the recommendation.
+        4. Search query is applied only for web based applications.
+        5. Recommendation options should carry two apps , If there are no suitable local apps available you may select online free application as well.Url should be in this format: "https://xxxxxx.com".
+        6. If the path is local, set is_local to true, otherwise false.
+        Return the following structure:
+        [
+            {{
+                "recommendation": "<first 4-word suggestion>",
                 "recommendation_options": [
                     {{
-                    "app_name": "<app name 1>",
-                    "app_url": "<app url or path 1>",
-                    "search_query": "<search query 1>"
+                        "app_name": "<app name 1>",
+                        "app_url": "<app url or path 1>",
+                        "search_query": "<search query 1>",
+                        "is_local": <true or false>
                     }},
                     {{
-                    "app_name": "<app name 2>",
-                    "app_url": "<app url or path 2>",
-                    "search_query": "<search query 2>"
+                        "app_name": "<app name 2>",
+                        "app_url": "<app url or path 2>",
+                        "search_query": "<search query 2>",
+                        "is_local": <true or false>
                     }}
                 ]
-                }}'''
-        Three mood improvement suggestions (each 4 words) and two app recommendations for mood improvement.
-        Respond ONLY with the exact phrase from the list.
-        """
+            }},
+            {{
+                "recommendation": "<second suggestion>",
+                "recommendation_options": [ ...same as above... ]
+            }},
+            {{
+                "recommendation": "<third suggestion>",
+                "recommendation_options": [ ...same as above... ]
+            }}
+        ]
+    """
+
     try:
         response = requests.post(
-            "https://087f647be26e.ngrok-free.app/api/generate",  # Use local endpoint
+            "https://fa7a43f295fa.ngrok-free.app/api/generate",
             headers={"Content-Type": "application/json"},
-            json={
-                "model": "qwen3:4b",
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.2},
-                
-            }
+            json={"model": "qwen3:4b", "prompt": prompt, "stream": False, "options": {"temperature": 0.2}},
         )
 
-        # client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
-
-        # response = client.chat.completions.create(
-        #     model="deepseek-reasoner",
-        #     messages=[
-        #         {"role": "system", "content": "You are a helpful assistant"},
-        #         {"role": "user", "content": "Hello"},
-        #     ],
-        #     stream=False
-        # )
-
-        # print(response.choices[0].message.content)
-
-        
-        # Handle HTTP errors
         if response.status_code != 200:
             print(f"API error ({response.status_code}): {response.text[:100]}...")
-            return {"recommendation": "No action needed"}
-        
-        json_answer = response.json()["response"]
-        response_data = response.json()
-        print("Response from Ollama:", response_data)
-        resp_data = RecommendationResponse.model_validate(json_answer)
-        print(resp_data)
-        # Clean response from <think> tags if present
-        # recommendation, recommendation_options = parse_llm_response(response_data.get('response', ''))
-        recommendation = resp_data.recommendations
-        recommendation_options = resp_data.recommendation_options
-        
-        # Store in state
-        state.recommendation = recommendation
-        state.recommendation_options = recommendation_options
-        print(f"Recommendation: {recommendation}")
-        print(f"Recommendation options: {recommendation_options}")
+            return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        raw_response = response.json()["response"]
+        print("Raw Response:", raw_response)
+
+        # Extract JSON array from LLM response
+        match = re.search(r'\[[\s\S]*\]', raw_response)  # captures first JSON array
+        if not match:
+            raise ValueError("No valid JSON found in response.")
+        clean_json = match.group(0)  # only the JSON array
+        json_data = json.loads(clean_json)
+
+
+        # Convert to list of dictionaries
+        json_data = json.loads(clean_json)
+
+        # Validate with Pydantic
+        resp_data = RecommendationList(listofRecommendations=[
+            RecommendationResponse(**item) for item in json_data
+        ])
+        print("Parsed Response:", resp_data)
+
+        # Prepare lists for state
+        recommendations_list = []
+        recommendation_options_list = []
+
+        for rec in resp_data.listofRecommendations:
+            recommendations_list.append(rec.recommendations)
+            recommendation_options_list.append(rec.recommendation_options)
+
+        # Update state
+        state.recommendation = recommendations_list
+        state.recommendation_options = recommendation_options_list
+
+        print(f"Recommendations: {recommendations_list}")
+        print(f"Recommendation options: {recommendation_options_list}")
+
         return {
-            "recommendation": recommendation,
-            "recommendation_options": recommendation_options
+            "recommendation": recommendations_list,
+            "recommendation_options": recommendation_options_list
         }
-        
+
     except Exception as e:
         print("[Agent] Error parsing response:", e)
-        recommendation = "No action needed"
-        recommendation_options = []
+        return {
+            "recommendation": ["No action needed"],
+            "recommendation_options": []
+        }
+
 
 def send_blocking_message(title, message):
     MB_OK = 0x0
