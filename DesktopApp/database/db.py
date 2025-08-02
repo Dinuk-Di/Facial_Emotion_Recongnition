@@ -91,19 +91,19 @@ def apps(conn):
     conn.execute(query)
     conn.commit()
 
-    
+
 # Add emotion function
 def add_emotions(conn):
     emotions_data = [
-        ("ANGRY", False),
-        ("BOARING", False),
-        ("DISGUST", False),
-        ("FEAR", False),
-        ("HAPPY", True),
-        ("NEUTRAL", True),
-        ("SAD", False),
-        ("STRESS", False),
-        ("SURPRISE", True),
+        ("Angry", False),
+        ("Boring", False),
+        ("Disgust", False),
+        ("Fear", False),
+        ("Happy", True),
+        ("Neutral", True),
+        ("Sad", False),
+        ("Stress", False),
+        ("Surprise", True),
     ]
 
     cursor = conn.cursor()
@@ -147,6 +147,20 @@ def add_app_data(conn, user_id, category, app_name, app_url, path, is_local, sel
         """, (emotion_id, user_id, category, app_name, app_url, path, is_local))
 
     conn.commit()
+
+def delete_app_data(conn, app_id: int):
+    """
+    Deletes an app entry from the database.
+
+    :param conn: SQLite connection
+    :param app_id: ID of the app to delete
+    """
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM apps WHERE id = ?", (app_id,))
+    conn.commit()
+
+
+
 def get_apps_by_emotion(conn, emotion: str) -> List[Tuple]:
     """
     Fetches apps associated with a specific emotion.

@@ -54,7 +54,7 @@ class LoginWindow:
             return
 
         for user in users:
-            if user[1] == username and user[2] == password:
+            if user[1] == username:
                 self.root.destroy()
                 open_dashboard(username)
                 return

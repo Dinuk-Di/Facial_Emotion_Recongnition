@@ -1,4 +1,4 @@
-from typing import Dict, List,Optional
+from typing import Dict, List, Optional, Any
 import base64
 from collections import Counter
 import re
@@ -15,7 +15,17 @@ from pydantic import BaseModel
 from core.recommender_tools import open_recommendation
 from old_utils.runner_interface import launch_window
 from database.db import get_apps_by_emotion, get_connection
+from openai import OpenAI
+from dotenv import load_dotenv
+import os
+from langgraph.prebuilt import create_react_agent
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_community.llms import Ollama
 
+load_dotenv()
+
+API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 def run_agent_system(emotions):
     initial_state = AgentState(
@@ -41,6 +51,16 @@ class AgentState(BaseModel):
     executed: Optional[bool]
     action_executed: Optional[str]
     action_time_start: Optional[float]
+
+class AppRecommendation(BaseModel):
+    app_name: str
+    app_url: str
+    search_query: str
+
+class Recommendations(BaseModel):
+    recommendation: List[str]
+    recommendation_options: List[AppRecommendation]  # type: ignore
+
 
 
 def create_workflow():
@@ -68,13 +88,15 @@ def average_emotion_agent(state):
     print(f"[Agent] Average emotion: {most_common}")
     return {"average_emotion": most_common}
 
+# Remove reasoning tags from the response
 def clean_think_tags(text):
     cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     return cleaned_text.strip()
 
+
 def task_detection_agent(state):
     try:
-        if state.average_emotion == "Neutral":
+        if state.average_emotion == "Neutral" or state.average_emotion == "Happy" or state.average_emotion == "Surprise":
             print("[Agent] No task detection needed for neutral emotion.")
             return {"detected_task": "No Need to Detect Task"}
         # Capture screenshot as a base64 string (possibly with prefix)
@@ -245,100 +267,237 @@ def parse_llm_response(text):
         print("[Agent] Error parsing LLM response block:", e)
         return None, []
 
-def recommendation_agent(state):
+# def recommendation_agent(state):
 
+#     if "No Need to Detect Task" in state.detected_task or not state.detected_task:
+#         print("[Agent] No task detected, skipping recommendation.")
+#         return {"recommendation": "No action needed"}
+    
+#     emotion = state.average_emotion.lower()
+#     detected_task = state.detected_task
+#     print(f"[Agent] Calculating recommendation for emotion: {emotion} and task: {detected_task}")
+
+#     negative_emotions = ["angry", "sad", "fear", "disgust", "stress","boring"]
+
+#     if emotion not in negative_emotions:
+#         print("You are in a good mood")
+#         return {
+#             "recommendation": "No action needed",
+#             "recommendation_options": []
+#         }
+
+#     print("⚠️ Since the emotion is a negative one. Let's proceede next steps.")
+#     if emotion in negative_emotions:
+#         print(f"[Agent]{emotion}")  
+
+#     # get available apps from database
+#     conn = get_connection()
+#     if not conn:    
+#         print("[Agent] Failed to connect to the database.")
+#         return {"recommendation": "No action needed", "recommendation_options": []}
+#     print(f"[Agent] Fetching apps for emotion: {emotion}")
+#     available_apps = get_apps_by_emotion(conn, emotion)
+
+#     prompt = f"""
+#         User is feeling {emotion} and is currently working on the screen task: {detected_task}.
+#         User is looking for a way to improve mood.
+
+#         Here are the locally installed apps and their paths that can help:
+#         {available_apps}
+
+#         There are two outputs. 
+#         - 'recommendation': Suggestion to improve the mood. Give the most suitable 3 recommandations each containing 4 words, according to the selected apps and online available apps(like youtube, spotify, online games like free sites). 
+#         - 'recommendation_options': list of 2 apps that are available locally or online.
+#         The recommendation_options should be apps. It contains 3 parameters:
+#         - app_name: Name of the app
+#         - app_url: URL of the app ('https://xxxxxxx.com') or path of the app from above available_apps
+#         - search_query: If the app is a web browser, give a suitable search query to find the app.
+#         Response Formate:
+#         '''[
+#             {{
+#                 "recommendation": "",
+#                 "recommendation_options": [{{
+#                     "app_name": "",
+#                     "app_url": "",
+#                     "search_query": ""
+#                 }}],
+                
+#             }}]'''
+#         Respond ONLY with the exact phrase from the list.
+#         """
+    
+#     # Please install OpenAI SDK first: `pip3 install openai`
+
+#         # 
+
+#         # 
+
+        
+
+#         # 
+
+#     try:
+#         # response = requests.post(
+#         #     "https://087f647be26e.ngrok-free.app/api/generate",  # Use local endpoint
+#         #     headers={"Content-Type": "application/json"},
+#         #     json={
+#         #         "model": "qwen3:4b",
+#         #         "prompt": prompt,
+#         #         "stream": False,
+#         #         "options": {"temperature": 0.2},
+                
+#         #     }
+#         # )
+
+#         client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
+
+#         response = client.chat.completions.create(
+#             model="deepseek-reasoner",
+#             messages=[
+#                 {"role": "system", "content": "You are a helpful assistant"},
+#                 {"role": "user", "content": "Hello"},
+#             ],
+#             stream=False
+#         )
+
+#         print(response.choices[0].message.content)
+
+        
+#         # Handle HTTP errors
+#         if response.status_code != 200:
+#             print(f"API error ({response.status_code}): {response.text[:100]}...")
+#             return {"recommendation": "No action needed"}
+            
+#         response_data = response.json()
+#         print("Response from Ollama:", response_data)
+#         # Clean response from <think> tags if present
+#         recommendation, recommendation_options = parse_llm_response(response_data.get('response', ''))
+        
+#         # Validate response format
+#         valid_recommendation = ["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
+        
+#         if recommendation not in valid_recommendation:
+#             print(f"[Warning] Invalid recommendation: {recommendation}")
+#             recommendation = "No action needed"
+        
+#         # Store in state
+#         state.recommendation = recommendation
+#         state.recommendation_options = recommendation_options
+#         print(f"Recommendation: {recommendation}")
+#         print(f"Recommendation options: {recommendation_options}")
+#         return {
+#             "recommendation": recommendation,
+#             "recommendation_options": recommendation_options
+#         }
+        
+#     except Exception as e:
+#         print("[Agent] Error parsing response:", e)
+#         recommendation = "No action needed"
+#         recommendation_options = []
+
+# Define structured output model
+class AppRecommendation(BaseModel):
+    app_name: str = Field(description="Name of recommended application")
+    app_url: str = Field(description="URL or local path of the application")
+    search_query: str = Field(description="Search query if web-based application")
+
+class RecommendationResponse(BaseModel):
+    recommendations: List[str] = Field(description="Three 4-word mood improvement suggestions")
+    recommendation_options: List[AppRecommendation] = Field(description="Two app recommendations")
+
+def recommendation_agent(state: Any) -> Dict[str, Any]:
+    # Skip if no task detected
     if "No Need to Detect Task" in state.detected_task or not state.detected_task:
-        print("[Agent] No task detected, skipping recommendation.")
-        return {"recommendation": "No action needed"}
+        return {"recommendations": [], "recommendation_options": []}
     
     emotion = state.average_emotion.lower()
-    detected_task = state.detected_task
-    print(f"[Agent] Calculating recommendation for emotion: {emotion} and task: {detected_task}")
-
-    negative_emotions = ["angry", "sad", "fear", "disgust", "stress","boring"]
-
+    negative_emotions = ["angry", "sad", "fear", "disgust", "stress", "boring"]
+    
+    # Skip if positive emotion
     if emotion not in negative_emotions:
-        print("You are in a good mood")
-        return {
-            "recommendation": "No action needed",
-            "recommendation_options": []
-        }
-
-    print("⚠️ Since the emotion is a negative one. Let's proceede next steps.")
-    if emotion in negative_emotions:
-        print(f"[Agent]{emotion}")  
-
-    # get available apps from database
+        return {"recommendations": [], "recommendation_options": []}
+    
+    # Get available apps from database
     conn = get_connection()
-    if not conn:    
-        print("[Agent] Failed to connect to the database.")
-        return {"recommendation": "No action needed", "recommendation_options": []}
-    print(f"[Agent] Fetching apps for emotion: {emotion}")
-    available_apps = get_apps_by_emotion(conn, emotion.capitalize())
-
-    prompt = f"""
-        User is feeling {emotion} and is currently working on the screen task: {detected_task}.
-        User is looking for a way to improve mood.
-
-        There are two outputs. 
-        - 'recommendation': Suggestion to improve the mood. Give the most suitable option from the list:-["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
-        - 'recommendation_options': list of 3 apps that is most suitable to accomplish the given recommendation. 
-        The recommendation_options should be apps from the list eg:-[ Discord, Spotify, Paint, Telegram Desktop, Zoom, Youtube, Microsoft Solitaire Collection] or any other suitable. 
-        Response Formate:
-        recommendation: Chat with friends
-        recommendation_options: [
-        (app_name: 'name of the app', text: '3,4 word sentence saying the purpose of the app', app_url: 'https://xxxxxxx.com', search_query: 'If the app through web browser, give a suitable search query'),
-        (app_name: '', text: '', app_url: '', search_query: ''),
-        (app_name: '' , text: '', app_url: '', search_query: ''),
-        ]
-        Respond ONLY with the exact phrase from the list.
-        """
-
-    try:
-        response = requests.post(
-            "https://087f647be26e.ngrok-free.app/api/generate",  # Use local endpoint
-            headers={"Content-Type": "application/json"},
-            json={
-                "model": "qwen3:4b",
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.2},
-                
-            }
-        )
-        
-        # Handle HTTP errors
-        if response.status_code != 200:
-            print(f"API error ({response.status_code}): {response.text[:100]}...")
-            return {"recommendation": "No action needed"}
-            
-        response_data = response.json()
-        print("Response from Ollama:", response_data)
-        # Clean response from <think> tags if present
-        recommendation, recommendation_options = parse_llm_response(response_data.get('response', ''))
-        
-        # Validate response format
-        valid_recommendation = ["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
-        
-        if recommendation not in valid_recommendation:
-            print(f"[Warning] Invalid recommendation: {recommendation}")
-            recommendation = "No action needed"
-        
-        # Store in state
-        state.recommendation = recommendation
-        state.recommendation_options = recommendation_options
-        print(f"Recommendation: {recommendation}")
-        print(f"Recommendation options: {recommendation_options}")
-        return {
-            "recommendation": recommendation,
-            "recommendation_options": recommendation_options
+    if not conn:
+        return {"recommendations": [], "recommendation_options": []}
+    
+    available_apps = get_apps_by_emotion(conn, emotion)
+    
+    # Define tool for app retrieval
+    tools = [
+        {
+            "name": "get_available_apps",
+            "description": "Retrieve locally installed applications for mood improvement",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "emotion": {"type": "string", "description": "Current user emotion"}
+                },
+                "required": ["emotion"]
+            },
+            "func": lambda emotion: available_apps  # Directly return pre-fetched apps
         }
-        
-    except Exception as e:
-        print("[Agent] Error parsing response:", e)
-        recommendation = "No action needed"
-        recommendation_options = []
-
+    ]
+    
+    # Create LLM instance
+    llm = Ollama(
+        model="qwen3:4b",
+        base_url="https://087f647be26e.ngrok-free.app",
+        temperature=0.2
+    )
+    
+    # Define prompt template
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You're a mood improvement assistant. Generate recommendations based on user's emotion: {emotion} and current task: {task}."),
+        ("human", "Suggest 3 mood improvement activities (4 words max) and recommend 2 apps from local: {apps} or web services like YouTube/Spotify.")
+    ])
+    
+    # Create react agent
+    agent = create_react_agent(
+        llm=llm,
+        tools=tools,
+        prompt=prompt,
+        output_schema=RecommendationResponse
+    )
+    
+    # Execute agent
+    response = agent.invoke({
+        "emotion": emotion,
+        "task": state.detected_task,
+        "apps": str(available_apps)
+    })
+    
+    # Process and validate response
+    valid_recommendations = ["Listen to songs", "Watch funny videos", "Chat with friends", 
+                            "Call a friend", "Play Quick game", "Do painting"]
+    
+    recommendations = [
+        rec for rec in response["recommendations"][:3] 
+        if rec in valid_recommendations
+    ]
+    
+    # Ensure we have exactly 3 recommendations
+    if len(recommendations) < 3:
+        recommendations += ["Take deep breaths"] * (3 - len(recommendations))
+    
+    # Format app recommendations
+    recommendation_options = []
+    for app in response["recommendation_options"][:2]:
+        recommendation_options.append({
+            "app_name": app.app_name,
+            "app_url": app.app_url,
+            "search_query": app.search_query
+        })
+    
+    # Update state
+    state.recommendations = recommendations
+    state.recommendation_options = recommendation_options
+    
+    return {
+        "recommendations": recommendations,
+        "recommendation_options": recommendation_options
+    }
 
 def send_blocking_message(title, message):
     MB_OK = 0x0
