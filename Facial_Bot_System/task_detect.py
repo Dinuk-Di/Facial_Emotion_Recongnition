@@ -1,5 +1,6 @@
 import base64
 import ollama
+import requests
 from utils.desktop import capture_desktop
 import requests
 
@@ -86,10 +87,14 @@ def task_detection_agent(state):
         # Parse JSON response
         response_data = response.json()
         detected_task = response_data.get('response', '').strip()
-        state.detected_task = detected_task
         print(f"Detected task: {detected_task}")
         return {"detected_task": detected_task}
 
     except Exception as e:
         print(f"Error detecting task: {str(e)}")
+
         return {"detected_task": "unknown"}
+    
+if __name__ == "__main__":
+    task_detection_agent()
+
