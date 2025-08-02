@@ -58,7 +58,7 @@ class AgentState(BaseModel):
 
 
 class RecommendationResponse(BaseModel):
-    recommendation: List[str] = Field(description="4-word mood improvement suggestions")
+    recommendation: str = Field(description="4-word mood improvement suggestions")
     recommendation_options: List[AppRecommendation] = Field(description="Two app recommendations")
 
 class RecommendationList(BaseModel):
@@ -302,12 +302,13 @@ def recommendation_agent(state):
         {available_apps}
 
         Output must be ONLY valid JSON. No text, no explanation, no tags and correct key value pairs. When selecting apps, consider:
-        1. If the app is a web-based application, use the URL.
-        2. If the app is a desktop application, use the path to the executable.
+        1. If the app is a web-based application, use the URL as app_url.
+        2. If the app is a desktop application, use the path as the app_url.
         3. Check the app's is matching for the recommendation.
         4. Search query is applied only for web based applications.
-        5. Recommendation options should carry two apps , If there are no suitable local apps available you may select online free application as well.Url should be in this format: "https://xxxxxx.com".
-        6. If the path is local, set is_local to true, otherwise false.
+        5. Recommendation options should carry two apps , If there are no suitable local apps available,select online free applications(like youtube, online games, facebook, etc) as well.Url should be in this format: "https://xxxxxx.com".
+        6. If the app_url is local, set is_local to true, otherwise false.
+        7. Do not use the same app more than twice in the recommendations. Include web-based applications as much as you can.
         Return the following structure:
         [
             {{
@@ -315,13 +316,13 @@ def recommendation_agent(state):
                 "recommendation_options": [
                     {{
                         "app_name": "<app name 1>",
-                        "app_url": "<app url or path 1>",
+                        "app_url": "<app url or local path>",
                         "search_query": "<search query 1>",
                         "is_local": <true or false>
                     }},
                     {{
                         "app_name": "<app name 2>",
-                        "app_url": "<app url or path 2>",
+                        "app_url": "<app url or local path>",
                         "search_query": "<search query 2>",
                         "is_local": <true or false>
                     }}
@@ -337,7 +338,6 @@ def recommendation_agent(state):
             }}
         ]
     """
-
     try:
         response = requests.post(
             "https://fa7a43f295fa.ngrok-free.app/api/generate",
@@ -351,19 +351,8 @@ def recommendation_agent(state):
 
         raw_response = response.json()["response"]
         print("Raw Response:", raw_response)
-
-        # Extract JSON array from LLM response
-        match = re.search(r'\[[\s\S]*\]', raw_response)  # captures first JSON array
-        if not match:
-            raise ValueError("No valid JSON found in response.")
-        clean_json = match.group(0)  # only the JSON array
+        clean_json = clean_think_tags(raw_response)
         json_data = json.loads(clean_json)
-
-
-        # Convert to list of dictionaries
-        json_data = json.loads(clean_json)
-
-        # Validate with Pydantic
         resp_data = RecommendationList(listofRecommendations=[
             RecommendationResponse(**item) for item in json_data
         ])
@@ -374,7 +363,7 @@ def recommendation_agent(state):
         recommendation_options_list = []
 
         for rec in resp_data.listofRecommendations:
-            recommendations_list.append(rec.recommendations)
+            recommendations_list.append(rec.recommendation)
             recommendation_options_list.append(rec.recommendation_options)
 
         # Update state
