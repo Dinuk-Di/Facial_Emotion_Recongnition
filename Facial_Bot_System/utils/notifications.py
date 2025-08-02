@@ -3,29 +3,71 @@ from selenium.webdriver.chrome.options import Options
 import win32api
 import win32con
 import time
+import subprocess
+import webbrowser
+from win11toast import toast
+import os
+import threading
 
-def send_notification(title, message):
-    win32api.MessageBox(0, message, title, win32con.MB_ICONINFORMATION)
+icon_path = r'F:/Academic/7th semester/FYP/recommondation_agents_implementation/assests/Icon.jpg'
+executer_path = r'C:/Users/rpras/OneDrive/Documents/Rashmitha/Semester_7/project/Features/executer.pyw'
 
-def execute_task(recommendation):
-    def launch_browser(url):
+def send_notification(recommendation,timeout=20):
+    event = threading.Event()
+    user_action = False
+    print(f"[notification] {recommendation}")
+    
+
+    if not os.path.exists(icon_path):
+        print(f"Warning: Icon file not found at {icon_path}")
+        icon = None
+    else:
+        icon = {
+        'src': icon_path,
+        'placement': 'appLogoOverride'
+        }
+
+    def on_click(*args):
         try:
-            options = Options()
-            options.add_argument("--start-maximized")
-            driver = webdriver.Chrome(options=options)
-            driver.get(url)
+            #subprocess.Popen(["pythonw", executer_path], shell=True)
+            nonlocal user_action
+            user_action = True
+            event.set()
         except Exception as e:
-            print(f"Error launching browser: {e}")
+            print(f"Error executing script: {e}")
 
-    actions = {
-        "Play music": lambda: launch_browser("https://open.spotify.com"),
-        "Watch funny videos": lambda: launch_browser("https://www.youtube.com/results?search_query=funny+videos"),
-        "Take a break": lambda: send_notification("Break Time", "Try deep breathing:\n1. Inhale 4s\n2. Hold 4s\n3. Exhale 6s"),
-        "Quick game": lambda: launch_browser("https://www.chess.com/play/computer"),
-        "Coding Bot": lambda: launch_browser("https://www.replit.com"),
-    }
+    # def on_click():
+    #     try:
+    #         print("Clicked")
+    #     except Exception as e:
+    #         print(f"Error executing script: {e}")
 
-    action = actions.get(recommendation, lambda: None)
-    action()
+    try:
+        toast('Emotion Recognition Test ', str(recommendation) , icon=icon,  app_id="EMOFI", on_click=on_click, button='Dismiss')
+        print("notification sent")
+    except Exception as e:
+        print(f"Error sending notification: {e}")
 
+
+    event.wait(timeout)
+    return user_action
+
+
+def execute_task(option):
     time.sleep(5)
+    try:
+        app_name = option.get("app_name")
+        app_url = option.get("app_url")
+        search_query = option.get("search_query")
+
+        if app_url.startswith("http"):
+            if search_query:
+                webbrowser.open(f"{app_url}/results?search_query={search_query}")
+            else:
+                webbrowser.open(app_url)
+        elif "://" in app_url:
+            subprocess.Popen([app_url], shell=True)
+        else:
+            print(f"Unknown URL format: {app_url}")
+    except Exception as e:
+        print(f"[Execution Error] {e}")

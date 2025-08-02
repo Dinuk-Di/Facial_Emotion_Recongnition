@@ -16,7 +16,7 @@ class FaceEmotionDetector:
         self.face_cascade = cv2.CascadeClassifier(
             cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
         )
-        self.model = YOLO("Models/best_new.pt")
+        self.model = YOLO(r"F:\Academic\7th semester\FYP\recommondation_agents_implementation\models\best_new.pt")
         self.class_names = ['Angry', 'Boring', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Stress', 'Suprise']
         self.emotion_window = []
         self.last_process_time = time.time()
@@ -36,10 +36,11 @@ class FaceEmotionDetector:
     def run_agent_system(self, emotions):
         try:
             final_state = process_agent_system(emotions)
+            print("final state in face_detection :", final_state)
             if self.status_ui:
                 self.status_ui.update_status(
                     emotion=final_state.average_emotion,
-                    detected_task=final_state.detected_task,
+                    # detected_task=final_state.detected_task,
                     recommendation=final_state.recommendation,
                     executed=final_state.executed
                 )
