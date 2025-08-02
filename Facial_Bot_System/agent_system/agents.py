@@ -244,7 +244,7 @@ def recommendation_agent(state):
         There are two outputs. 
         - 'recommendation': Suggestion to improve the mood. Give the most suitable option from the list:-["Listen to songs", "Watch funny videos", "Chat with friends", "Call a friend", "Play Quick game", "Do painting"]
         - 'recommendation_options': list of 3 apps that is most suitable to accomplish the given recommendation. 
-        The recommendation_options should be apps from the list eg:-[ Discord, Spotify, Paint, Microsoft Teams, Telegram Desktop, Zoom, Youtube, Facebook, Instergram, Microsoft Solitaire Collection] or any other suitable. 
+        The recommendation_options should be apps from the list eg:-[ WhatsApp, Spotify, Discord,  Paint, Microsoft Teams, Telegram Desktop, Zoom, Youtube, Facebook, Instergram, Microsoft Solitaire Collection] or any other suitable. 
         Response Formate:
         recommendation: Chat with friends
         recommendation_options: [
