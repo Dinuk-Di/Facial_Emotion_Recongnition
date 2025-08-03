@@ -419,6 +419,7 @@ class AppController:
 
                 if self.agent_mode:
                     time.sleep(1)
+                    
                     continue
 
                 # Human Detection

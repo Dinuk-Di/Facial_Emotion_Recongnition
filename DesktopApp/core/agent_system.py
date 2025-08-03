@@ -14,7 +14,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from core.recommender_tools import open_recommendation
 from old_utils.runner_interface import launch_window
-from database.db import get_apps_by_emotion, get_connection
+from database.db import get_apps_by_emotion, get_connection, add_agent_recommendations
 from dotenv import load_dotenv
 import os
 import json
@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
+
 
 def run_agent_system(emotions):
     initial_state = AgentState(
@@ -243,6 +244,8 @@ def task_detection_agent(state):
 #     # This line runs only after user presses OK in the message box
 #     execute_task(recommendation)
 #     return {"executed": True}
+
+
 def parse_llm_response(text):
     try:
         # Clean <think> tags if present
@@ -345,6 +348,7 @@ def recommendation_agent(state):
             json={"model": "qwen3:4b", "prompt": prompt, "stream": False, "options": {"temperature": 0.2}},
         )
 
+       
         if response.status_code != 200:
             print(f"API error ({response.status_code}): {response.text[:100]}...")
             return {"recommendation": ["No action needed"], "recommendation_options": []}
@@ -372,6 +376,25 @@ def recommendation_agent(state):
 
         print(f"Recommendations: {recommendations_list}")
         print(f"Recommendation options: {recommendation_options_list}")
+        
+        
+
+        for i, recommendation_type in enumerate(recommendations_list):
+                for option in recommendation_options_list[i]:
+                    recommed_app = option.app_name
+                    app_url = option.app_url
+                    search_query = option.search_query
+                    is_local = option.is_local
+
+                    add_agent_recommendations(
+                        conn,
+                        1,
+                        recommendation_type,
+                        recommed_app,
+                        app_url,
+                        search_query,
+                        is_local
+                    )
 
         return {
             "recommendation": recommendations_list,

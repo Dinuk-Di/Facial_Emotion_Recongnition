@@ -15,6 +15,7 @@ def initialize_db():
     emotions(conn)
     apps(conn)
     add_emotions(conn)
+    agent_recommendations(conn)
     return conn
 
 def get_connection():
@@ -46,6 +47,31 @@ def app_settings(conn):
     );
     """
     conn.execute(query)
+    conn.commit()
+
+def agent_recommendations(conn):
+    query = """
+    CREATE TABLE IF NOT EXISTS agent_recommendations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        recommendation_type TEXT NOT NULL,
+        recommed_app TEXT NOT NULL,
+        app_url TEXT,
+        search_query TEXT,
+        is_local BOOLEAN NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    );
+    """
+    conn.execute(query)
+    conn.commit()
+
+def add_agent_recommendations(conn, user_id, recommendation_type, recommed_app, app_url, search_query, is_local):
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO agent_recommendations (user_id, recommendation_type, recommed_app, app_url, search_query, is_local)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, recommendation_type, recommed_app, app_url, search_query, is_local))
+    print(f"[Info] Added agent recommendation for user {user_id}: {recommed_app}")
     conn.commit()
 
 def recommendation_history(conn):
