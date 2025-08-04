@@ -100,8 +100,8 @@ from ultralytics import YOLO
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
-HAND_YOLO = YOLO("Models/yolov8n.pt")
-HAND_MODEL = load_model("Models/hand_movement.h5")
+HAND_YOLO = YOLO(r"Models/yolov8n.pt")
+HAND_MODEL = load_model(r"Models/hand_movement.h5")
 HAND_CLASSES = ['Boring', 'Neutral', 'Stress']
 
 def detect_hand(frame, yolo_conf: float = 0.3, conf_thres: float = 0.5, min_person_area: int = 10000) -> list:

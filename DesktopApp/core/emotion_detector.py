@@ -53,7 +53,7 @@
 import cv2
 from ultralytics import YOLO
 
-EMOTION_MODEL = YOLO("Models/best.pt")
+EMOTION_MODEL = YOLO(r"Models\best.pt")
 EMOTION_CLASS_NAMES = ['Angry', 'Boring', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Stress', 'Suprise']
 
 def get_emotion(frame, conf_thres: float = 0.5) -> list:

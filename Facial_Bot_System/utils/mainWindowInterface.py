@@ -76,6 +76,7 @@ class WhatsAppWindow(QDialog):
         self.setWindowTitle("Send WhatsApp Message")
         self.setFixedSize(400, 200)
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.user_action = None
 
         # Layout
         layout = QVBoxLayout(self)
@@ -110,12 +111,15 @@ class WhatsAppWindow(QDialog):
     def emit_send_message(self):
         phone = self.phone_input.text().strip()
         message = self.message_input.text().strip()
+        self.user_action = "send_message"
         self.sendMessageRequested.emit(phone, message)
 
     def open_whatsapp_app(self):
-       self.openAppRequest.emit(True)
-       print("openAppRequest in mainwindowinterface: ", self.openAppRequest)
-
+        print("Open WhatsApp button clicked")
+        self.user_action = "open_app"
+        self.openAppRequest.emit(True)
+        print("openAppRequest in mainwindowinterface: ", self.openAppRequest)
+        self.close()  # Close the dialog
 class InteraceMainwindow(object):
 
     def __init__(self):
@@ -417,12 +421,10 @@ class InteraceMainwindow(object):
         self.search_frame.setVisible(True)
         self.ChoiceFrame.setVisible(False)
         
-        if search_type == "telegram":
-            self.search_input.setPlaceholderText("Enter Telegram username (e.g., @username)")
-            self.search_button.setText("Find User")
-        else:  # youtube
+        if search_type == "youtube":
             self.search_input.setPlaceholderText("Enter search query...")
             self.search_button.setText("Search")
+        
 
     def on_search_clicked(self):
         search_query = self.search_input.text()

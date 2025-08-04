@@ -82,7 +82,7 @@ def signal_function(signal):
     global open_app
     open_app = signal
 
-def open_recommendation(recommendation: dict, main_window = None) -> str:
+def open_recommendation(recommendation: dict) -> str:
 
     global launched_apps, opened_browser_tabs, opened_apps_info, open_app
 
@@ -92,14 +92,17 @@ def open_recommendation(recommendation: dict, main_window = None) -> str:
     app_name_lower = app_name.lower()
 
     open_app = True
-
+    print("Selected tool is: ", app_name_lower)
     if app_name_lower == "whatsapp":
+        print("Whatsapp is selected")
 
-        if main_window:
-            print("Catched openAppRequest in recommender")
-            main_window.openAppRequest.connect(signal_function)
+        if recommendation["action"] == "open_app":
             print("Whatsapp window opened")
-            main_window.open_whatsapp_window()
+            open_app = True
+            print("open_app: ", open_app)
+        elif recommendation["action"] == "send_message":
+            open_app = False
+            print("open_app: ", open_app)
 
     if open_app:
         for app_info in kNOWN_APPS_LIST:

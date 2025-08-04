@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from PySide6.QtCore import QCoreApplication, QMetaObject, QRect, QSize, Qt, Signal, QPropertyAnimation
+from PySide6.QtCore import QCoreApplication, QMetaObject, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QFont, QIcon
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget, QPushButton, QGroupBox)
+from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget, QPushButton, QGroupBox, QDialog)
 from PySide6.QtWidgets import QLineEdit, QPushButton
 
 class ClickableFrame(QFrame):
@@ -63,6 +63,56 @@ class ClickableFrame(QFrame):
             }}
         """)
         super().mouseReleaseEvent(event)
+
+    
+class WhatsAppWindow(QDialog):
+    sendMessageRequested = Signal(str, str)  # phone, message
+    openAppRequest = Signal(bool)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Send WhatsApp Message")
+        self.setFixedSize(400, 200)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        # Layout
+        layout = QVBoxLayout(self)
+
+        # Input for phone number
+        layout.addWidget(QLabel("WhatsApp Phone Number (+country code):"))
+        self.phone_input = QLineEdit()
+        self.phone_input.setPlaceholderText("+1234567890")
+        layout.addWidget(self.phone_input)
+
+        # Input for message
+        layout.addWidget(QLabel("Message to send:"))
+        self.message_input = QLineEdit()
+        self.message_input.setPlaceholderText("Enter message here...")
+        layout.addWidget(self.message_input)
+
+
+        # Buttons layout
+        buttons_layout = QHBoxLayout()
+        self.send_btn = QPushButton("Send Message")
+        self.open_app_btn = QPushButton("Open WhatsApp")
+
+        buttons_layout.addWidget(self.send_btn)
+        buttons_layout.addWidget(self.open_app_btn)
+        layout.addLayout(buttons_layout)
+
+        # Connect buttons
+        self.send_btn.clicked.connect(self.emit_send_message)
+        self.open_app_btn.clicked.connect(self.open_whatsapp_app)
+        
+
+    def emit_send_message(self):
+        phone = self.phone_input.text().strip()
+        message = self.message_input.text().strip()
+        self.sendMessageRequested.emit(phone, message)
+
+    def open_whatsapp_app(self):
+       self.openAppRequest.emit(True)
+       print("openAppRequest in mainwindowinterface: ", self.openAppRequest)
+
 
 class InteraceMainwindow(object):
 
@@ -363,10 +413,7 @@ class InteraceMainwindow(object):
         self.search_frame.setVisible(True)
         self.ChoiceFrame.setVisible(False)
         
-        if search_type == "telegram":
-            self.search_input.setPlaceholderText("Enter Telegram username (e.g., @username)")
-            self.search_button.setText("Find User")
-        else:  # youtube
+        if search_type == "youtube":
             self.search_input.setPlaceholderText("Enter search query...")
             self.search_button.setText("Search")
 
@@ -378,16 +425,32 @@ class InteraceMainwindow(object):
             if hasattr(self, 'selected_choice'):
                 search_query = self.selected_choice.get('search_query', '')
         
-        # Determine which callback to use based on placeholder text
-        if "Telegram username" in self.search_input.placeholderText():
-            if hasattr(self, 'telegram_search_callback'):
-                self.telegram_search_callback(search_query)
-        else:
-            if hasattr(self, 'search_callback'):
-                self.search_callback(search_query)
+    
+        if hasattr(self, 'search_callback'):
+            self.search_callback(search_query)
         self.show_search(False)
 
     def on_cancel_clicked(self):
         self.show_search(False)
         if hasattr(self, 'search_callback'):
             self.search_callback(None)
+
+    def on_choice_clicked(self, text, id):
+        if text == "Whatsapp":
+            self.open_whatsapp_window()
+
+    def open_whatsapp_window(self):
+        # Open WhatsApp window at the same position as the main window
+        # Parent widget is MainFrame's window
+        parent_window = self.centralwidget.window()
+
+        # Create instance of WhatsAppWindow
+        self.whatsapp_dialog = WhatsAppWindow(parent=parent_window)
+
+        # Position the WhatsApp dialog exactly over the main window
+        pos = parent_window.pos()  # QPoint
+        self.whatsapp_dialog.move(pos)
+
+        # Show the window as modal dialog
+        self.whatsapp_dialog.show()
+

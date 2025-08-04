@@ -77,7 +77,7 @@ from functools import lru_cache
 logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
-def _load_yolo(model_path: str = "Models/yolov8n.pt"):
+def _load_yolo(model_path: str = r"Models/yolov8n.pt"):
     return YOLO(model_path)
 
 def human_present(frame, conf_thres: float = 0.4, imgsz: int = 320) -> bool:

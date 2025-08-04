@@ -8,7 +8,7 @@ import time
 import win32api
 import win32con
 import pywhatkit
-from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QDialog
 from PySide6.QtCore import Qt, QFile, QTextStream, Signal
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -43,9 +43,12 @@ def setup_Icons(app_name, icon_paths):
     return icon_path
 
 class MainWindow(QMainWindow):
-    openAppRequest = Signal(bool)
+    # openAppRequest = Signal(bool)
     def __init__(self, choices):
         super().__init__()
+
+        # Configure DPI awareness before UI setup
+        self.configure_dpi_awareness()
 
         self.selectedChoice = None
         self.allchoices = choices
@@ -53,7 +56,10 @@ class MainWindow(QMainWindow):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.ui = InteraceMainwindow()
         self.ui.setupUi(self)
-        
+        self.whatsapp_action = None
+
+        # Configure ChromeDriver
+        self.chrome_service = self.setup_chrome_service()
 
         # Connect search callback
         self.ui.search_callback = self.handle_youtube_search
@@ -83,9 +89,11 @@ class MainWindow(QMainWindow):
         elif app_name == 'whatsapp':
             # Instead of show_search, open the WhatsApp window aligned with main window
             self.open_whatsapp_window()
+            print("whatsapp window closed")
         else:
             print(f"Selected: {id},{content}")
             self.close()
+        self.close()
         
     
     def handle_youtube_search(self, query):
@@ -106,15 +114,73 @@ class MainWindow(QMainWindow):
             self.close()
     #def show_recommendations(self, show):
 
+    def configure_dpi_awareness(self):
+        """Multi-layered DPI awareness configuration"""
+        try:
+            # Windows API level (works on Windows 10 1607+)
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)  # Per-monitor DPI aware
+        except:
+            try:
+                # Fallback for older Windows versions
+                ctypes.windll.user32.SetProcessDPIAware()
+            except:
+                pass
+        
+        # Qt level
+        os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
+        os.environ["QT_SCALE_FACTOR"] = "1"
+        os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+
+    def setup_chrome_service(self):
+        """Robust ChromeDriver setup with multiple fallbacks"""
+        try:
+            # Method 1: Automatic management with proper ChromeType detection
+            driver_path = ChromeDriverManager(chrome_type=ChromeType.GOOGLE).install()
+            service = Service(driver_path)
+            # Test the driver
+            options = Options()
+            options.add_argument("--headless")
+            test_driver = webdriver.Chrome(service=service, options=options)
+            test_driver.quit()
+            return service
+        except Exception as e:
+            print(f"ChromeDriver auto-install failed: {e}")
+
     def open_whatsapp_window(self):
         if self.ui.whatsapp_dialog is None:
             self.ui.whatsapp_dialog = WhatsAppWindow(parent=self)
             self.ui.whatsapp_dialog.sendMessageRequested.connect(self.handle_send_whatsapp_message)
             self.ui.whatsapp_dialog.openAppRequest.connect(self.handle_open_whatsapp)
-        else:
-            self.ui.whatsapp_dialog.show()
-            self.ui.whatsapp_dialog.raise_()
-            self.ui.whatsapp_dialog.activateWindow()
+        
+        # Execute the dialog modally
+        result = self.ui.whatsapp_dialog.exec_()
+        
+        # After dialog closes, update selectedChoice based on user action
+        if result == QDialog.Accepted and hasattr(self.ui.whatsapp_dialog, 'user_action'):
+            print ("whatsapp user action hasattr: ")
+            if self.ui.whatsapp_dialog.user_action == "open_app":
+                self.selectedChoice = {
+                    'text': 'Open WhatsApp', 
+                    'app_name': 'WhatsApp',
+                    'action': 'open_app',
+                    'app_url': 'https://web.whatsapp.com/'
+                }
+                print ("came to whats app actions: ", self.selectedChoice)
+                return True
+                
+            elif self.ui.whatsapp_dialog.user_action == "send_message":
+                self.selectedChoice = {
+                    'text': 'Open WhatsApp', 
+                    'app_name': 'WhatsApp',
+                    'action': 'send_message',
+                    'app_url': 'https://web.whatsapp.com/'
+                }
+                print ("came to whats app actions: ", self.selectedChoice)
+        
+        return self.ui.whatsapp_dialog.user_action if hasattr(self.ui.whatsapp_dialog, 'user_action') else None
+
 
     def handle_send_whatsapp_message(self, phone, message):
         if not phone or not phone.startswith('+') or len(phone) < 8:
@@ -124,8 +190,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Input Error", "Please enter a message to send.")
             return
 
-        # Optional: Additional phone number validation (e.g., country code format) can be added here.
-        self.openAppRequest.emit(False)
         try:
             pywhatkit.sendwhatmsg_instantly(
                 phone_no=phone,
@@ -136,19 +200,23 @@ class MainWindow(QMainWindow):
             )
             print("Message sent successfully")
             self.ui.whatsapp_dialog.close()
+            self.whatsapp_action = "send_message"
+            self.ui.whatsapp_dialog.user_action = "send_message"
             print("Whasapp window closed successfully")
             QMessageBox.information(self, "Success", f"WhatsApp message sent to {phone}")
+            return
             
         except Exception as e:
             self.ui.whatsapp_dialog.close()
             QMessageBox.critical(self, "Error", f"Failed to send WhatsApp message:\n{str(e)}")
     
     def handle_open_whatsapp(self, signal):
-        self.openAppRequest.emit(signal)
-        print("Signal for open app,openAppRequest: ", signal , self.openAppRequest)
-        print("Whatsapp app opened successfully")
-        self.ui.whatsapp_dialog.close()
-        print("Whasapp window closed successfully")
+        if signal:
+            self.whatsapp_action = "open_app"  # Track the action
+            self.ui.whatsapp_dialog.user_action = "open_app"
+            self.ui.whatsapp_dialog.accept()  # Close dialog with Accepted status
+            return True
+        return False
 
 
 def launch_window(options):
