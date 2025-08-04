@@ -193,12 +193,3 @@ def get_apps(conn) -> List[Tuple]:
     # get name, category and path only
     filtered_data = [(row[2], row[3], row[5]) for row in all_data]
     return filtered_data
-
-
-# # main 
-# if __name__ == "__main__":
-#     conn = get_connection()
-#     apps_list = get_apps_by_emotion(conn, "Stress")
-#     for app in apps_list:
-#         print(app)
-#     conn.close()
