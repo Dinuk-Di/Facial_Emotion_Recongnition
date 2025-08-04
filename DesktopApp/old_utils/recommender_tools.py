@@ -11,8 +11,8 @@ from typing import Optional,Dict, List
 import webbrowser
 from old_utils.contactWindowInterface import ContactWindowInterface
 import uuid
-from core.app_config import kNOWN_APPS_LIST
-from core.communication_apps_config import COMMUNICATION_APPS_LIST
+from DesktopApp.old_utils.app_config import kNOWN_APPS_LIST
+from DesktopApp.old_utils.communication_apps_config import COMMUNICATION_APPS_LIST
 import json
 import sqlite3
 from datetime import datetime, timedelta

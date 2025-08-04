@@ -19,8 +19,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from old_utils.notifications import send_notification
 from old_utils.contactWindowInterface import ContactWindowInterface
-from core.app_config import kNOWN_APPS_LIST
-from core.communication_apps_config import COMMUNICATION_APPS_LIST
+from DesktopApp.old_utils.app_config import kNOWN_APPS_LIST
+from DesktopApp.old_utils.communication_apps_config import COMMUNICATION_APPS_LIST
 
 launched_apps = {}
 opened_browser_instances = []  # Track browser instances we launched

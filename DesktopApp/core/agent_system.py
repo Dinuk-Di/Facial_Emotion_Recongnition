@@ -12,7 +12,7 @@ import ctypes
 from collections import Counter
 from typing import List, Optional
 from pydantic import BaseModel
-from core.recommender_tools import open_recommendation
+from DesktopApp.old_utils.recommender_tools import open_recommendation
 from old_utils.runner_interface import launch_window
 from utils.tools import open_recommendations
 from database.db import get_apps, get_connection,add_agent_recommendations
