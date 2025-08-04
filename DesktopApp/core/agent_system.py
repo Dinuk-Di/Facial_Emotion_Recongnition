@@ -454,6 +454,7 @@ def task_execution_agent(state):
         if chosen_recommendation:
             print("Opening recommendations...")
             open_recommendations(chosen_recommendation)
+            state.executed = True
             return {
                     "executed": True,
                 }
@@ -464,7 +465,7 @@ def task_exit_agent(state):
         return {"executed": False, "action_time_start": None}
     print("Thread is running")
     while task_executed:
-        time.sleep(15)
+        time.sleep(20)
         task_executed = False
     print("Thread is closed")
     return {"executed": False, "action_time_start": None}
