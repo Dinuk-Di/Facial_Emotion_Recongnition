@@ -16,6 +16,7 @@ def initialize_db():
     apps(conn)
     add_emotions(conn)
     agent_recommendations(conn)
+    add_initial_apps(conn)
     return conn
 
 def get_connection():
@@ -155,7 +156,31 @@ def delete_app_data(conn, app_id: int):
     cursor.execute("DELETE FROM apps WHERE id = ?", (app_id,))
     conn.commit()
 
+def add_initial_apps(conn):
+    """
+    Adds initial apps to the database.
+    """
+    initial_apps = [
+        (1, 'Games', 'Subway Surfers', None, 'https://poki.com/en/g/subway-surfers', False),
+        (1, 'Games', 'Brain Test', None, 'https://poki.com/en/g/brain-test-tricky-puzzles', False),
+        (1, 'Games', 'Bike Game', None, 'https://poki.com/en/g/stunt-bike-extreme', False),
+        (1,'Entertainment', 'YouTube', None, 'https://www.youtube.com', False),
+        (1,'Entertainment', 'Films', None, 'https://myflixerz.to/', False),
+        (1,'Songs', 'Spotify', None, 'https://open.spotify.com/', False),
+        (1,'Songs', 'SoundCloud', None, 'https://soundcloud.com/', False),
+        (1,'SocialMedia','WhatsApp',None,'https://web.whatsapp.com/',False),
+        (1,'SocialMedia','Facebook',None,'https://www.facebook.com/',False),
+        (1,'Help','ChatGPT',None,'https://chatgpt.com/',False),
+        (1,'Help','Perplexity',None,'https://www.perplexity.ai/',False)
+        
+    ]
 
+    cursor = conn.cursor()
+    cursor.executemany("""
+        INSERT INTO apps (user_id, category, app_name, app_url, path, is_local)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, initial_apps)
+    conn.commit()
 
 def get_apps(conn) -> List[Tuple]:
     """

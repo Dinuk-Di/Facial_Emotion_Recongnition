@@ -202,15 +202,17 @@ class AppController:
                 t1.join()
                 t2.join()
 
+                
                 if emotion_result:
                     self.log(f"[Emotion Detection] Detected: {emotion_result}")
                     self.emotion_log.extend(emotion_result)
 
                 if hand_result:
                     self.log(f"[Hand Detection] Detected: {hand_result}")
-
-                self.emotion_log.extend(emotion_result)
-                self.emotion_log.extend(hand_result)
+                    self.emotion_log.extend(hand_result)
+                   
+                
+               
 
                 self.emotion_counter.update(emotion_result)
                 self.hand_counter.update(hand_result)

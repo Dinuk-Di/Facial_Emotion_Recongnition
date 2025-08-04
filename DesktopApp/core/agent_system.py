@@ -465,7 +465,7 @@ def task_exit_agent(state):
         return {"executed": False, "action_time_start": None}
     print("Thread is running")
     while task_executed:
-        time.sleep(10)
+        time.sleep(15)
         task_executed = False
     print("Thread is closed")
     return {"executed": False, "action_time_start": None}

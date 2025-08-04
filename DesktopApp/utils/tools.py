@@ -49,15 +49,23 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         if "<search_query>" in app_url:
             if search_query and search_query.strip():
                 encoded_query = urllib.parse.quote(search_query.strip())
-                return app_url.replace("<search_query>", encoded_query)
+                app_url = app_url.replace("<search_query>", encoded_query)
+                print("Changed App URL", app_url)
+                return app_url
             else:
-                return app_url.replace("<search_query>", "")  # remove placeholder if no query
+                app_url = app_url.replace("<search_query>", "")  # remove placeholder if no query
+                print("Changed App URL", app_url)
+                return app_url
         else:
             # If there is no placeholder, append query as ?search_query=
             if search_query and search_query.strip():
                 encoded_query = urllib.parse.quote(search_query.strip())
                 delimiter = "&" if "?" in app_url else "?"
-                return f"{app_url}{delimiter}search_query={encoded_query}"
+                app_url = f"{app_url}{delimiter}search_query={encoded_query}"
+                print("Changed App URL", app_url)
+                return app_url
+
+            print("Changed App URL", app_url)
             return app_url
 
     
