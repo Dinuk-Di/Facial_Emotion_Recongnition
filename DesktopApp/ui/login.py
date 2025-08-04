@@ -2,6 +2,9 @@ import customtkinter as ctk
 from tkinter import messagebox
 from database.db import get_connection
 from ui.dashboard import open_dashboard
+import subprocess
+import sys
+import os
 
 class LoginWindow:
     def __init__(self, root):
@@ -27,6 +30,9 @@ class LoginWindow:
 
         ctk.CTkButton(frame, text="Login", command=self.login).pack(pady=10)
         ctk.CTkButton(frame, text="Register", command=self.register).pack()
+
+        # ✅ New button for Chatbot
+        ctk.CTkButton(frame, text="Open Chatbot", command=self.open_chatbot).pack(pady=10)
 
     def position_bottom_right(self):
         self.root.update_idletasks()
@@ -67,3 +73,9 @@ class LoginWindow:
         root = ctk.CTk()  # Also use CTk here!
         RegisterWindow(root)
         root.mainloop()
+
+    def open_chatbot(self):
+        # ✅ Launch chatbot.py in a separate process
+        chatbot_file = os.path.join(os.path.dirname(__file__), "chatbot.py")
+        python_exec = sys.executable
+        subprocess.Popen([python_exec, chatbot_file])

