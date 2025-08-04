@@ -19,3 +19,4 @@ build
 Setups
 *.env
 *.db
+*.pyc

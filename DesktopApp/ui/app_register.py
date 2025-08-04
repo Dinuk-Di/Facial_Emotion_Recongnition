@@ -153,14 +153,47 @@ class AppRegister:
         name_entry = ctk.CTkEntry(name_frame, width=240)
         name_entry.pack(side="left", padx=(0, 5))
 
+        # def search_installed_apps():
+        #     name = name_entry.get().lower()
+        #     matches = [app for app in self.get_installed_programs() if name in app[0].lower()]
+        #     if matches:
+        #         location_entry.delete(0, "end")
+        #         location_entry.insert(0, matches[0][1])
+        #     else:
+        #         messagebox.showinfo("Not Found", "App not found. Please enter path manually.")
+
         def search_installed_apps():
             name = name_entry.get().lower()
             matches = [app for app in self.get_installed_programs() if name in app[0].lower()]
             if matches:
+                install_location = matches[0][1]
+                exe_path = find_executable_in_folder(install_location)
                 location_entry.delete(0, "end")
-                location_entry.insert(0, matches[0][1])
+                if exe_path:
+                    location_entry.insert(0, exe_path)
+                else:
+                    location_entry.insert(0, install_location)  # fallback to folder
+                    messagebox.showinfo("Executable Not Found", "App found, but .exe file not located.")
             else:
                 messagebox.showinfo("Not Found", "App not found. Please enter path manually.")
+
+        def find_executable_in_folder(folder_path):
+            if not os.path.isdir(folder_path):
+                return None
+
+            exe_files = []
+            for root, dirs, files in os.walk(folder_path):
+                for file in files:
+                    if file.lower().endswith(".exe"):
+                        exe_files.append(os.path.join(root, file))
+
+            # Optionally: filter or rank executables to find the main one
+            if exe_files:
+                # Example: return the shortest path or the one that matches folder name
+                exe_files.sort(key=lambda x: len(x))  # heuristic: shortest path = most likely
+                return exe_files[0]
+
+            return None
 
         search_btn = ctk.CTkButton(name_frame, text="🔍", width=40, command=search_installed_apps)
         search_btn.pack(side="left")
@@ -182,27 +215,7 @@ class AppRegister:
         browse_btn = ctk.CTkButton(location_frame, text="📁", width=40, command=browse_file)
         browse_btn.pack(side="left")
 
-        # # Emotion Selection (Scrollable)
-        # ctk.CTkLabel(popup, text="Select Emotions:").pack(anchor="w", padx=20, pady=(10, 0))
-
-        # emotion_scroll_container = ctk.CTkFrame(popup)
-        # emotion_scroll_container.pack(padx=20, pady=5, fill="x")
-
-        # emotion_scroll_frame = ctk.CTkScrollableFrame(
-        #     emotion_scroll_container,
-        #     orientation="horizontal",
-        #     height=60,
-        #     corner_radius=5,
-        #     fg_color="transparent"
-        # )
-        # emotion_scroll_frame.pack(fill="x", expand=True)
-
-        # emotion_vars = []
-        # for emo in self.emotions:
-        #     var = ctk.BooleanVar()
-        #     cb = ctk.CTkCheckBox(emotion_scroll_frame, text=emo, variable=var)
-        #     cb.pack(side="left", padx=5)
-        #     emotion_vars.append((emo, var))
+        
 
     # Save App Button
         def save_app():

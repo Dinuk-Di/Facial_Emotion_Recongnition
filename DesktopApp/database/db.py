@@ -137,18 +137,11 @@ def add_emotions(conn):
     conn.commit()
 
 def add_app_data(conn, user_id, category, app_name, app_url, path, is_local):
-
-
     cursor = conn.cursor()
-    if path and not path.endswith("\\"):
-        path += "\\"
-    path += app_name + ".exe"
-
     cursor.execute("""
             INSERT INTO apps (user_id, category, app_name, app_url, path, is_local)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (user_id, category, app_name, app_url, path, is_local))
-
     conn.commit()
 
 def delete_app_data(conn, app_id: int):

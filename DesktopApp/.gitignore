@@ -20,3 +20,4 @@ Setups
 *.pyc
 *.db
 *.env
+*.pyc
