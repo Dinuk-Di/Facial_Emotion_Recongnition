@@ -4,6 +4,7 @@ import time
 import threading
 import webbrowser
 from win11toast import toast
+import urllib
 
 try:
     # Selenium setup for web apps—allows controlled close
@@ -14,6 +15,11 @@ try:
 except ImportError:
     _SELENIUM_AVAILABLE = False
 
+SEARCH_PATTERNS = {
+    "youtube": "https://www.youtube.com/results?search_query={query}",
+    "spotify": "https://open.spotify.com/search/{query}",
+    "google": "https://www.google.com/search?q={query}"
+}
 
 def open_recommendations(chosen_recommendation: dict) -> str:
     """
@@ -24,6 +30,22 @@ def open_recommendations(chosen_recommendation: dict) -> str:
     app_url = chosen_recommendation.get("app_url", "")
     search_query = chosen_recommendation.get("search_query", "")
     is_local = chosen_recommendation.get("is_local", False)
+
+    def build_url(app_name, app_url, search_query):
+        if search_query:
+            encoded_query = urllib.parse.quote(search_query.strip())
+            if app_name in SEARCH_PATTERNS:
+                return SEARCH_PATTERNS[app_name].format(query=encoded_query)
+            else:
+                # url = app_url
+                # if search_query and search_query.strip():
+                #     q = search_query.replace(" ", "+")
+                #     delimiter = "&" if "?" in app_url else "?"
+                #     url = f"{app_url}{delimiter}search_query={q}"
+                return f"{app_url}/results?search_query={encoded_query}"
+        return app_url
+
+    
 
     def notify_and_close_local(proc):
         """
@@ -83,13 +105,7 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         if not app_url.startswith(("http://", "https://")):
             return f"Error: Invalid or missing URL for web app '{app_name}': {app_url}"
 
-        # Append search query if present
-        if search_query:
-            q = search_query.replace(" ", "+")
-            delimiter = "&" if "?" in app_url else "?"
-            url = f"{app_url}{delimiter}q={q}"
-        else:
-            url = app_url
+        url = build_url(app_name, app_url, search_query)
 
         # If Selenium is available, use it to open browser so we can close
         if _SELENIUM_AVAILABLE:

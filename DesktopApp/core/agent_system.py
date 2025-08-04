@@ -125,7 +125,7 @@ def task_detection_agent(state):
             "Content-Type": "application/json"
         }
         response = requests.post(
-            "https://fa7a43f295fa.ngrok-free.app/api/generate",
+            "https://d53cb0fd37cb.ngrok-free.app/api/generate",
             headers=headers,
             json={
                 "model": "llava:7b",
@@ -290,7 +290,7 @@ def recommendation_agent(state):
             }
 
         res = requests.post(
-             "https://fa7a43f295fa.ngrok-free.app/api/generate",  # Use local endpoint
+             "https://d53cb0fd37cb.ngrok-free.app/api/generate",  # Use local endpoint
             headers={"Content-Type": "application/json"},
             json={
                 "model": "qwen3:4b",
