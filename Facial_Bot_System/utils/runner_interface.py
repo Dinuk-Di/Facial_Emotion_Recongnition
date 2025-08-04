@@ -47,9 +47,6 @@ class MainWindow(QMainWindow):
     def __init__(self, choices):
         super().__init__()
 
-        # Configure DPI awareness before UI setup
-        self.configure_dpi_awareness()
-
         self.selectedChoice = None
         self.allchoices = choices
         self.setWindowFlag(Qt.FramelessWindowHint)
@@ -57,9 +54,6 @@ class MainWindow(QMainWindow):
         self.ui = InteraceMainwindow()
         self.ui.setupUi(self)
         self.whatsapp_action = None
-
-        # Configure ChromeDriver
-        self.chrome_service = self.setup_chrome_service()
 
         # Connect search callback
         self.ui.search_callback = self.handle_youtube_search
@@ -113,40 +107,6 @@ class MainWindow(QMainWindow):
             self.selectedChoice = youtube_choice
             self.close()
     #def show_recommendations(self, show):
-
-    def configure_dpi_awareness(self):
-        """Multi-layered DPI awareness configuration"""
-        try:
-            # Windows API level (works on Windows 10 1607+)
-            ctypes.windll.shcore.SetProcessDpiAwareness(2)  # Per-monitor DPI aware
-        except:
-            try:
-                # Fallback for older Windows versions
-                ctypes.windll.user32.SetProcessDPIAware()
-            except:
-                pass
-        
-        # Qt level
-        os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
-        os.environ["QT_SCALE_FACTOR"] = "1"
-        os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
-
-    def setup_chrome_service(self):
-        """Robust ChromeDriver setup with multiple fallbacks"""
-        try:
-            # Method 1: Automatic management with proper ChromeType detection
-            driver_path = ChromeDriverManager(chrome_type=ChromeType.GOOGLE).install()
-            service = Service(driver_path)
-            # Test the driver
-            options = Options()
-            options.add_argument("--headless")
-            test_driver = webdriver.Chrome(service=service, options=options)
-            test_driver.quit()
-            return service
-        except Exception as e:
-            print(f"ChromeDriver auto-install failed: {e}")
 
     def open_whatsapp_window(self):
         if self.ui.whatsapp_dialog is None:
