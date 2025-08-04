@@ -31,19 +31,34 @@ def open_recommendations(chosen_recommendation: dict) -> str:
     search_query = chosen_recommendation.get("search_query", "")
     is_local = chosen_recommendation.get("is_local", False)
 
-    def build_url(app_name, app_url, search_query):
-        if search_query:
-            encoded_query = urllib.parse.quote(search_query.strip())
-            if app_name in SEARCH_PATTERNS:
-                return SEARCH_PATTERNS[app_name].format(query=encoded_query)
+    # def build_url(app_name, app_url, search_query):
+    #     if search_query:
+    #         encoded_query = urllib.parse.quote(search_query.strip())
+    #         if app_name in SEARCH_PATTERNS:
+    #             return SEARCH_PATTERNS[app_name].format(query=encoded_query)
+    #         else:
+    #             return f"{app_url}/results?search_query={encoded_query}"
+    #     return app_url
+
+    def build_url(app_url: str, search_query: str) -> str:
+        """
+        Build the full URL based on app_url and optional search_query.
+        If app_url contains '<search_query>', it will be replaced by encoded query.
+        If search_query is missing, '<search_query>' will be removed.
+        """
+        if "<search_query>" in app_url:
+            if search_query and search_query.strip():
+                encoded_query = urllib.parse.quote(search_query.strip())
+                return app_url.replace("<search_query>", encoded_query)
             else:
-                # url = app_url
-                # if search_query and search_query.strip():
-                #     q = search_query.replace(" ", "+")
-                #     delimiter = "&" if "?" in app_url else "?"
-                #     url = f"{app_url}{delimiter}search_query={q}"
-                return f"{app_url}/results?search_query={encoded_query}"
-        return app_url
+                return app_url.replace("<search_query>", "")  # remove placeholder if no query
+        else:
+            # If there is no placeholder, append query as ?search_query=
+            if search_query and search_query.strip():
+                encoded_query = urllib.parse.quote(search_query.strip())
+                delimiter = "&" if "?" in app_url else "?"
+                return f"{app_url}{delimiter}search_query={encoded_query}"
+            return app_url
 
     
 
@@ -105,7 +120,7 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         if not app_url.startswith(("http://", "https://")):
             return f"Error: Invalid or missing URL for web app '{app_name}': {app_url}"
 
-        url = build_url(app_name, app_url, search_query)
+        url = build_url(app_url, search_query)
 
         # If Selenium is available, use it to open browser so we can close
         if _SELENIUM_AVAILABLE:

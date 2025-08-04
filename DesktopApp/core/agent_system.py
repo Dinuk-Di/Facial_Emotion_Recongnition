@@ -30,7 +30,7 @@ def run_agent_system(emotions):
     initial_state = AgentState(
         emotions=emotions,
         average_emotion=None,
-        detected_task=None,
+        # detected_task=None,
         recommendation=None,
         recommendation_options= [],
         executed=False,
@@ -56,7 +56,7 @@ class RecommendationList(BaseModel):
 class AgentState(BaseModel):
     emotions: List[str]
     average_emotion: Optional[str]
-    detected_task: Optional[str]
+    # detected_task: Optional[str]
     recommendation: Optional[List[str]]  # list of suggestions
     recommendation_options: Optional[List[List[AppRecommendation]]]
     executed: Optional[bool]
@@ -67,13 +67,14 @@ class AgentState(BaseModel):
 def create_workflow():
     workflow = StateGraph(AgentState)
     workflow.add_node("calculate_emotion", average_emotion_agent)
-    workflow.add_node("detect_task", task_detection_agent)
+    # workflow.add_node("detect_task", task_detection_agent)
     workflow.add_node("generate_recommendation", recommendation_agent)
     workflow.add_node("execute_action", task_execution_agent)
     workflow.add_node("exit_action", task_exit_agent)
     workflow.set_entry_point("calculate_emotion")
-    workflow.add_edge("calculate_emotion", "detect_task")
-    workflow.add_edge("detect_task", "generate_recommendation")
+    # workflow.add_edge("calculate_emotion", "detect_task")
+    # workflow.add_edge("detect_task", "generate_recommendation")
+    workflow.add_edge("calculate_emotion", "generate_recommendation")
     workflow.add_edge("generate_recommendation", "execute_action")
     workflow.add_edge("execute_action", "exit_action")
     workflow.add_edge("exit_action", END)
@@ -198,13 +199,14 @@ def extract_json_from_text(text):
         return None
     
 def recommendation_agent(state):
-    if not state.detected_task or "No Need to Detect Task" in state.detected_task:
-        print("[Agent] No task detected – skipping recommendation.")
-        return {"recommendation": ["No action needed"], "recommendation_options": []}
+    # if not state.detected_task or "No Need to Detect Task" in state.detected_task:
+    #     print("[Agent] No task detected – skipping recommendation.")
+    #     return {"recommendation": ["No action needed"], "recommendation_options": []}
+
 
     emotion = state.average_emotion
-    task = state.detected_task
-    print(f"[Agent] Processing for emotion={emotion!r}, task={task!r}")
+    # task = state.detected_task
+    print(f"[Agent] Processing for emotion={emotion!r}")
 
     negative_emotions = ["Angry", "Sad", "Fear", "Disgust", "Stress", "Boring"]
     if emotion not in negative_emotions:
@@ -218,22 +220,84 @@ def recommendation_agent(state):
 
     available_apps = get_apps(conn)
     print("[Agent] Available apps:", available_apps)
-    prompt = f"""
-            User feels {emotion} while working on: {task}.
-            Looking for 3 four-word mood-improvement suggestions.
+    # prompt = f"""
+    #         User feels {emotion} while working on: {task}.
+    #         Looking for 3 four-word mood-improvement suggestions.
 
-            Installed apps (category|name|path):
+    #         Installed apps (category|name|path):
+    #         {available_apps!r}
+
+    #         Return ONLY valid JSON. No text, no notes. Output must be an array of 3 objects:
+    #         - recommendation: exactly four words
+    #         - recommendation_options: array of 2 items each with:
+    #             app_name (str),
+    #             app_url (URL or local path),
+    #             search_query (str, only for web apps),
+    #             is_local (bool)
+    #         Conditions to check seriously before returning:
+    #         - Each recommendation must have 2 app options.
+    #         - No duplicates, do not use webapp if local app is available in installed apps.
+    #         - All URLs must start with "https://" and if we can use a search query in the given app then append <search_query> token where suitable since each app search query is different from one another . 
+    #         - Each local app sets `is_local: true`.
+    #         """
+
+    prompt = f"""
+            You are a recommendation engine.
+
+            Context:
+            - User feels: "{emotion}"
+            - Available installed apps (format: category | name | path):
             {available_apps!r}
 
-            Return ONLY valid JSON. No text, no notes. Output must be an array of 3 objects:
-            - recommendation: exactly four words
-            - recommendation_options: array of 2 items each with:
-                app_name (str),
-                app_url (URL or local path),
-                search_query (str, only for web apps),
-                is_local (bool)
-            No duplicates, prefer web apps. All URLs must start with "https://". Each local app sets `is_local: true`.
+            Goal:
+            Generate EXACTLY 3 mood-improvement suggestions, each consisting of:
+            - recommendation: A phrase of exactly FOUR words.
+            - recommendation_options: An array of EXACTLY 2 options per recommendation. Each option must include:
+                - app_name: (string)
+                - app_url: (either a valid HTTPS URL for web apps OR local file path for installed apps)
+                - search_query: (string, required only for web apps)
+                - is_local: (true if app is installed locally, false if web)
+
+            STRICT RULES:
+            1. Output ONLY valid JSON — no extra text, no explanations, no markdown.
+            2. JSON format: An array of 3 objects with keys: recommendation, recommendation_options.
+            3. Each recommendation must have TWO different apps (no duplicates across or within).
+            4. Prefer local apps over web apps if available.
+            5. For web apps:
+            - All URLs must start with "https://".
+            - Use "<search_query>" placeholder in the app_url instead of inserting actual query.
+            - Example web apps are YouTube, Spotify, Online Game (https://poki.com/), MyFlixer (https://myflixerz.to/).
+            6. For local apps:
+            - Use given path as app_url and set is_local = true.
+            - search_query is empty
+            7. Don't use same app in multiple recommendations.
+            8. Each recommendation must be exactly 4 words, meaningful, and mood-impro
+            
+
+            Example of expected structure (do NOT include this in response):
+            [
+            {{
+                "recommendation": "Take a quick break",
+                "recommendation_options": [
+                {{
+                    "app_name": "Spotify",
+                    "app_url": "https://open.spotify.com/search/<search_query>",
+                    "search_query": "relaxing music",
+                    "is_local": false
+                }},
+                {{
+                    "app_name": "KMPlayer",
+                    "app_url": "C:\\\\Program Files\\\\KMPlayer 64X\\\\KMPlayer.exe",
+                    "search_query": "",
+                    "is_local": true
+                }}
+                ]
+            }}
+            ]
+
+            Now, produce the final JSON output:
             """
+
 
     full_schema = RecommendationList.model_json_schema()
 
