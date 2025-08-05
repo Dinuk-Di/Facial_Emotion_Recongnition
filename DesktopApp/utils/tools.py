@@ -75,11 +75,15 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         Sends toast then terminates the process.
         """
         try:
+            icon_path = os.path.join(
+                os.path.dirname(__file__), "..", "assets", "res", "Icon.ico"
+            )
+            icon_path = os.path.abspath(icon_path) if os.path.exists(icon_path) else None
             toast = Notification(
                 app_id="EMOFI",  # This replaces "Python" in the header
                 title="Focus Reminder",
                 msg="Time to get back to work!",
-                icon= "assets/res/Icon.jpg" # Optional: path to .ico file
+                icon= icon_path
             )
             toast.show()
         except Exception as ntf_err:
@@ -98,11 +102,15 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         Sends toast then closes the Selenium driver/browser.
         """
         try:
+            icon_path = os.path.join(
+                os.path.dirname(__file__), "..", "assets", "res", "Icon.ico"
+            )
+            icon_path = os.path.abspath(icon_path) if os.path.exists(icon_path) else None
             toast = Notification(
                 app_id="EMOFI",  # This replaces "Python" in the header
                 title="Focus Reminder",
                 msg="Time to get back to work!",
-                icon= "assets/res/Icon.jpg" # Optional: path to .ico file
+                icon= icon_path
             )
             toast.show()
         except Exception as ntf_err:

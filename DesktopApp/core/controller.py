@@ -359,10 +359,14 @@ class AppController:
 
     def buzzer_and_notify(self):
         try:
-            icon_path = os.path.abspath("icon.ico") if os.path.exists("icon.ico") else None
+            icon_path = os.path.join(
+                os.path.dirname(__file__), "..", "assets", "res", "Icon.ico"
+            )
+            icon_path = os.path.abspath(icon_path) if os.path.exists(icon_path) else None
+
             toast = Notification(
-                app_id="EMOFI",  # This shows instead of "Python" in the header
-                title="Sleep Alert",
+                app_id="EMOFI",
+                title="Focus Alert",
                 msg="You are not focused!",
                 icon=icon_path
             )
