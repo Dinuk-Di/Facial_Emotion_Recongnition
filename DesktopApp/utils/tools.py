@@ -5,6 +5,15 @@ import threading
 import webbrowser
 from winotify import Notification, audio
 import urllib
+import win32api
+import win32gui
+import win32com.shell.shell as shell
+import threading
+import time
+import ctypes
+import win32con
+from win32com.shell import shellcon
+import psutil
 
 try:
     # Selenium setup for web apps—allows controlled close
@@ -21,7 +30,7 @@ SEARCH_PATTERNS = {
     "google": "https://www.google.com/search?q={query}"
 }
 
-def open_recommendations(chosen_recommendation: dict) -> str:
+def open_recommendations(chosen_recommendation: dict) -> bool:
     """
     Launches a local app or opens a web app (Selenium-based browser if available).
     Sends a "Time to get back to work" toast and auto-closes after 10 seconds.
@@ -68,8 +77,6 @@ def open_recommendations(chosen_recommendation: dict) -> str:
             print("Changed App URL", app_url)
             return app_url
 
-    
-
     def notify_and_close_local(proc):
         """
         Sends toast then terminates the process.
@@ -107,8 +114,8 @@ def open_recommendations(chosen_recommendation: dict) -> str:
             )
             icon_path = os.path.abspath(icon_path) if os.path.exists(icon_path) else None
             toast = Notification(
-                app_id="EMOFI",  # This replaces "Python" in the header
-                title="Focus Reminder",
+                app_id="EMOFI",
+                title="Back to Work!",
                 msg="Time to get back to work!",
                 icon= icon_path
             )
@@ -120,22 +127,79 @@ def open_recommendations(chosen_recommendation: dict) -> str:
             driver.quit()
         except Exception as e:
             print(f"[Driver quit failed] {e}")
+            
+    def launch_and_monitor_elevated(exe_path, close_after=20):
+        # Launch elevated via ShellExecuteEx
+        proc_info = shell.ShellExecuteEx(
+            lpVerb='runas',
+            lpFile=exe_path,
+            lpParameters='',
+            nShow=win32con.SW_SHOWNORMAL,
+            fMask=shellcon.SEE_MASK_NOCLOSEPROCESS
+        )
+        proc_handle = proc_info['hProcess']
+        pid = None
+        try:
+            pid = shell.GetProcessId(proc_handle)
+        except Exception:
+            pid = None
+
+        if not pid:
+            print("Failed to get PID; using handle directly")
+        else:
+            print(f"Launched elevated process PID {pid}")
+
+        # Schedule termination
+        threading.Timer(close_after, notify_and_close_elevated, args=(pid,)).start()
+        return pid
+
+    def notify_and_close_elevated(pid):
+        try:
+            Notification(app_id="EMOFI", title="Back to Work!",
+                        msg="Time to get back to work!").show()
+        except Exception as ntf:
+            print("Notification failed:", ntf)
+
+        time.sleep(0.5)
+        if pid:
+            try:
+                proc = psutil.Process(pid)
+                for child in proc.children(recursive=True):
+                    child.terminate()
+                proc.terminate()
+                gone, alive = psutil.wait_procs([proc] + proc.children(), timeout=2)
+                for p in alive:
+                    p.kill()
+                print(f"Killed elevated process PID {pid}")
+            except Exception as e:
+                print("Error killing elevated process:", e)
 
     # 1) Local app path
     if is_local:
         if not app_url:
-            return f"Error: No path provided for local app '{app_name}'."
+            print(f"Error: No path provided for local app '{app_name}'.")
+            return False
         if not os.path.isfile(app_url):
-            return f"Error: File not found for local app '{app_name}': {app_url}"
+            print(f"Error: File not found for local app '{app_name}': {app_url}")
+            return False
 
         try:
             print(f"[Launch] {app_name} from {app_url}")
-            proc = subprocess.Popen([app_url], shell=False)
+            # proc = subprocess.Popen([app_url], shell=False)
+            win32api.ShellExecute(
+                        0,                      # hwnd: handle to parent window (0 for no parent)
+                        "open",                 # operation: "open", "print", "edit", "explore", "find"
+                        app_url,         # file: The program to execute (explorer.exe for shell:Appsfolder
+                        None,                   # parameters: The AUMID as a shell URI
+                        None,                   # directory: default directory
+                        win32con.SW_SHOWNORMAL  # show command: how the application is shown
+                    )
         except Exception as ex:
-            return f"Error launching local app '{app_name}': {ex}"
+            print(f"Error launching local app '{app_name}': {ex}")
+            return False
 
         # Schedule close + notification in 10 seconds
-        timer = threading.Timer(20.0, notify_and_close_local, args=(proc,))
+        timer = threading.Timer(20.0, launch_and_monitor_elevated, args=(app_url,))
         timer.daemon = True
         timer.start()
 
@@ -146,7 +210,8 @@ def open_recommendations(chosen_recommendation: dict) -> str:
     # 2) Web app
     else:
         if not app_url.startswith(("http://", "https://")):
-            return f"Error: Invalid or missing URL for web app '{app_name}': {app_url}"
+            print(f"Error: Invalid or missing URL for web app '{app_name}': {app_url}")
+            return False
 
         url = build_url(app_url, search_query)
 
@@ -181,7 +246,8 @@ def open_recommendations(chosen_recommendation: dict) -> str:
                 print(f"[Webbrowser Open] {app_name} at {url}")
                 toast("Reminder",
                       f"Opened {app_name} via default browser; install Selenium to enable auto‑close.")
-                return f"Opened '{app_name}' via webbrowser: {url}. No auto‑close due to missing Selenium."
+                print(f"Opened '{app_name}' via webbrowser: {url}. No auto‑close due to missing Selenium.")
+                return True
             except Exception as ex:
                 print(f"[Webbrowser launch failed] {ex}")
                 return False

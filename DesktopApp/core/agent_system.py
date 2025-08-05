@@ -33,7 +33,7 @@ def run_agent_system(emotions):
     initial_state = AgentState(
         emotions=emotions,
         average_emotion=None,
-        
+        continue_workflow=None,
         recommendation=None,
         recommendation_options= [],
         executed=False,
@@ -59,12 +59,14 @@ class RecommendationList(BaseModel):
 class AgentState(BaseModel):
     emotions: List[str]
     average_emotion: Optional[str]
-    # detected_task: Optional[str]
+    continue_workflow: Optional[bool]
     recommendation: Optional[List[str]]  # list of suggestions
     recommendation_options: Optional[List[List[AppRecommendation]]]
     executed: Optional[bool]
     action_executed: Optional[str]
     action_time_start: Optional[float]
+    # open_app_handle: Optional[Any] = None  # PID or driver object
+    # app_type: Optional[str] = None  # 'local' or 'web'
 
 
 def create_workflow():
@@ -78,10 +80,12 @@ def create_workflow():
     workflow.add_edge("calculate_emotion", "interrupt_check")
     workflow.add_conditional_edges(
         "interrupt_check",
-        lambda state: "generate_recommendation" if state.get("continue_workflow") else END,
+        lambda state: "generate_recommendation" if state.continue_workflow else END,
     )
     workflow.add_edge("generate_recommendation", "execute_action")
-    workflow.add_edge("execute_action", "exit_action")
+    workflow.add_conditional_edges(
+        "execute_action", lambda state: "exit_action" if state.executed else END,
+    )
     workflow.add_edge("exit_action", END)
     return workflow.compile()
 
@@ -96,21 +100,6 @@ def average_emotion_agent(state):
     most_common = counter.most_common(1)[0][0]
     print(f"[Agent] Average emotion: {most_common}")
 
-    negative_emotions = ["Angry", "Sad", "Fear", "Disgust", "Stress", "Boring"]
-
-    if most_common in negative_emotions:
-        # Show notification with OK button
-        user_response = show_notification_with_ok(
-            title="Your Emotion Is Not Good",
-            message="Shall we give some suggestions to boost your mood?",
-            duration=15  # Notification auto-dismiss after 15 sec
-        )
-
-        if not user_response:  # If user didn't click OK in time
-            print("[Agent] No user response, ending workflow.")
-            # End the workflow early by setting executed=True and returning END
-            return {"average_emotion": most_common, "executed": False}  # Skip rest of workflow
-        
     return {"average_emotion": most_common}
 
 # Remove reasoning tags from the response
@@ -118,61 +107,106 @@ def clean_think_tags(text):
     cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     return cleaned_text.strip()
 
-def show_notification_with_ok(title, message, duration=15):
-    """
-    Show Windows notification with OK button and wait for user response.
-    Returns True if OK clicked within duration, else False.
-    """
-    # Create the notification
-    toast = Notification(app_id="EMOFI", title=title, msg=message, duration="short")
+# def show_notification_with_ok(title, message, duration=15):
+#     """
+#     Show Windows notification with OK button and wait for user response.
+#     Returns True if OK clicked within duration, else False.
+#     """
+#     # Create the notification
+#     toast = Notification(app_id="EMOFI", title=title, msg=message, duration="long")
 
-    # Add OK button that triggers a callback (using protocol)
-    toast.add_actions(label="OK")
+#     # Add OK button that triggers a callback (using protocol)
+#     toast.add_actions(label="OK")
 
-    # Show notification
-    toast.show()
+#     # Show notification
+#     toast.show()
 
-    # Wait for a certain time for the user to click (simulate by polling a flag)
-    clicked = {"status": False}
+#     # Wait for a certain time for the user to click (simulate by polling a flag)
+#     clicked = {"status": False}
 
-    def monitor_click():
-        # Simulate action URL check
-        # Real-world: This needs a listener or log check
-        for i in range(duration):
-            time.sleep(1)
-            # Here you'd check if the user clicked (through action callback or system log)
-            # We'll simulate by checking a file or variable
-            if clicked["status"]:
-                break
+#     def monitor_click():
+#         # Simulate action URL check
+#         # Real-world: This needs a listener or log check
+#         for i in range(duration):
+#             time.sleep(1)
+#             # Here you'd check if the user clicked (through action callback or system log)
+#             # We'll simulate by checking a file or variable
+#             if clicked["status"]:
+#                 break
 
-    # Start monitoring in a separate thread
-    t = threading.Thread(target=monitor_click)
-    t.start()
-    t.join(timeout=duration)
+#     # Start monitoring in a separate thread
+#     t = threading.Thread(target=monitor_click)
+#     t.start()
+#     t.join(timeout=duration)
+#     print("[Agent] User clicked OK:", clicked["status"])
 
-    return clicked["status"]
+#     return clicked["status"]
 
+
+
+# def interrupt_check_agent(state):
+#     print("[Agent] Running interrupt_check_agent...")
+
+#     # You could base this on the emotion if you want, or always send
+#     emotion = state.average_emotion
+    
+#     negative_emotions = ["Angry", "Sad", "Fear", "Disgust", "Stress", "Boring"]
+    
+#     user_response = None
+
+#     if emotion in negative_emotions:
+#         # Show notification with OK button
+#         user_response = show_notification_with_ok(
+#             title="Your Emotion Is Not Good",
+#             message="Shall we give some suggestions to boost your mood?",
+#             duration=15  # Notification auto-dismiss after 15 sec
+#         )
+
+#         if not user_response:  # If user didn't click OK in time
+#             print("[Agent] No user response, ending workflow.")
+#             # End the workflow early by setting executed=True and returning END
+#             return {"average_emotion": emotion, "executed": False} 
+#     print(f"[Agent] Emotion is {emotion}")
+
+
+#     if user_response is None or user_response == "No":
+#         print("[Agent] User declined. Ending workflow.")
+#         return {"continue_workflow": False}
+
+#     print("[Agent] User accepted. Continuing workflow.")
+#     return {"continue_workflow": True}
+    
+
+def show_notification_with_ok(title, message):
+    """Show Windows message box with OK/Cancel buttons"""
+    MB_OKCANCEL = 0x01
+    IDOK = 1
+    result = ctypes.windll.user32.MessageBoxW(0, message, title, MB_OKCANCEL)
+    return result == IDOK
 
 def interrupt_check_agent(state):
     print("[Agent] Running interrupt_check_agent...")
-
-    # You could base this on the emotion if you want, or always send
     emotion = state.average_emotion
-    print(f"[Agent] Emotion is {emotion}")
-
-    # Send notification and wait for user action (you can customize this)
-    user_response = show_notification_with_ok(
-        title="EMOFI: Mood Check",
-        message=f"Detected emotion: {emotion}. Do you want suggestions?",
-    )
-
-    if user_response is None or user_response == "No":
-        print("[Agent] User declined. Ending workflow.")
-        return {"continue_workflow": False}
-
-    print("[Agent] User accepted. Continuing workflow.")
-    return {"continue_workflow": True}
+    negative_emotions = ["Angry", "Sad", "Fear", "Disgust", "Stress", "Boring"]
     
+    # Always reset continue_workflow to False
+    state.continue_workflow = False
+    
+    if emotion in negative_emotions:
+        print(f"[Agent] Negative emotion detected: {emotion}")
+        # Show blocking message box
+        user_responded = show_notification_with_ok(
+            "Your Emotion Is Not Good",
+            "Shall we give some suggestions to boost your mood?"
+        )
+        
+        if user_responded:
+            print("[Agent] User accepted recommendations")
+            state.continue_workflow = True
+    else:
+        print(f"[Agent] Neutral/positive emotion: {emotion}")
+
+    return {"continue_workflow": state.continue_workflow}
 
 
 def parse_llm_response(text):
@@ -220,9 +254,6 @@ def extract_json_from_text(text):
         return None
     
 def recommendation_agent(state):
-    # if not state.detected_task or "No Need to Detect Task" in state.detected_task:
-    #     print("[Agent] No task detected – skipping recommendation.")
-    #     return {"recommendation": ["No action needed"], "recommendation_options": []}
     emotion = state.average_emotion
     # task = state.detected_task
     print(f"[Agent] Processing for emotion={emotion!r}")
@@ -456,8 +487,7 @@ def task_execution_agent(state):
         print("Chosen recommendation: ", chosen_recommendation)
         if chosen_recommendation:
             print("Opening recommendations...")
-            open_recommendations(chosen_recommendation)
-            AppState.set_executed(True)
+            is_opened = open_recommendations(chosen_recommendation)
             state.executed = True
             return {
                     "executed": True,
@@ -469,7 +499,7 @@ def task_exit_agent(state):
         return {"executed": False, "action_time_start": None}
     print("Thread is running")
     while task_executed:
-        time.sleep(20)
+        time.sleep(50)
         task_executed = False
     print("Thread is closed")
     return {"executed": False, "action_time_start": None}

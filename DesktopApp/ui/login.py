@@ -19,6 +19,7 @@ class LoginWindow:
 
          # ✅ Set App Icon (for window and taskbar)
         icon_path = os.path.join(os.path.dirname(__file__), "..", "assets/res", "Icon.jpg")
+        img_icon = None
         if os.path.exists(icon_path):
             pil_image = Image.open(icon_path)
             tk_icon = ImageTk.PhotoImage(pil_image)
