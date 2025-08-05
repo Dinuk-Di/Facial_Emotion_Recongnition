@@ -18,12 +18,13 @@ from dotenv import load_dotenv
 import os
 import json
 from pydantic import BaseModel, Field
-from old_utils.state import AppState
+from openai import OpenAI
 
 load_dotenv()
 
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
 QWEN_API_KEY = os.getenv("QWEN_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 def run_agent_system(emotions):
     initial_state = AgentState(
@@ -66,14 +67,20 @@ class AgentState(BaseModel):
 def create_workflow():
     workflow = StateGraph(AgentState)
     workflow.add_node("calculate_emotion", average_emotion_agent)
-    # workflow.add_node("detect_task", task_detection_agent)
+    workflow.add_node("interrupt_check", interrupt_check_agent)
     workflow.add_node("generate_recommendation", recommendation_agent)
     workflow.add_node("execute_action", task_execution_agent)
     workflow.add_node("exit_action", task_exit_agent)
     workflow.set_entry_point("calculate_emotion")
-    # workflow.add_edge("calculate_emotion", "detect_task")
-    # workflow.add_edge("detect_task", "generate_recommendation")
-    workflow.add_edge("calculate_emotion", "generate_recommendation")
+    workflow.add_edge("calculate_emotion", "interrupt_check")
+    workflow.add_conditional_edges(
+        "interrupt_check",
+        lambda state: "continue" if state.get("continue_workflow") else "end",
+        conditions={
+            "continue": "generate_recommendation",
+            "end": END
+        }
+    )
     workflow.add_edge("generate_recommendation", "execute_action")
     workflow.add_edge("execute_action", "exit_action")
     workflow.add_edge("exit_action", END)
@@ -95,61 +102,28 @@ def clean_think_tags(text):
     return cleaned_text.strip()
 
 
-def task_detection_agent(state):
-    try:
-        if state.average_emotion == "Neutral" or state.average_emotion == "Happy" or state.average_emotion == "Surprise":
-            print("[Agent] No task detection needed for neutral emotion.")
-            return {"detected_task": "No Need to Detect Task"}
-        # Capture screenshot as a base64 string (possibly with prefix)
-        screenshot = capture_desktop()
-        if not screenshot:
-            raise ValueError("Failed to capture screenshot")
-        # Remove data URI prefix if present
-        if screenshot.startswith('data:image'):
-            screenshot = screenshot.split(',')[1]
 
-        # Validate base64 string (optional, for debugging)
-        try:
-            base64.b64decode(screenshot)
-        except Exception as decode_err:
-            raise ValueError(f"Invalid base64 screenshot: {decode_err}")
 
-        # Send the raw base64 string (no prefix) to Ollama
-        # response = ollama.generate(
-        #     model="llava:7b",
-        #     prompt="Describe user's current activity. Focus on software and tasks.",
-        #     images=[screenshot]
-        # )
-        headers = {
-            "Connection": "close",  # Disable keep-alive
-            "Content-Type": "application/json"
-        }
-        response = requests.post(
-            "https://d53cb0fd37cb.ngrok-free.app/api/generate",
-            headers=headers,
-            json={
-                "model": "llava:7b",
-                "prompt": "Describe user's current activity. Focus on software and tasks.",
-                "images": [screenshot],
-                "stream": False
-            }
-        )
+def interrupt_check_agent(state):
+    print("[Agent] Running interrupt_check_agent...")
 
-        # Handle HTTP errors
-        if response.status_code != 200:
-            print(f"API error ({response.status_code}): {response.text[:100]}...")
-            return {"detected_task": "unknown"}
+    # You could base this on the emotion if you want, or always send
+    emotion = state.average_emotion
+    print(f"[Agent] Emotion is {emotion}")
 
-        # Parse JSON response
-        response_data = response.json()
-        detected_task = response_data.get('response', '').strip()
-        state.detected_task = detected_task
-        print(f"Detected task: {detected_task}")
-        return {"detected_task": detected_task}
+    # Send notification and wait for user action (you can customize this)
+    user_response = send_notification(
+        title="EMOFI: Mood Check",
+        message=[f"Detected emotion: {emotion}. Do you want suggestions?"],
+        options=[["Yes", "No"]]  # customize based on your system
+    )
 
-    except Exception as e:
-        print(f"Error detecting task: {str(e)}")
-        return {"detected_task": "unknown"}
+    if user_response is None or user_response == "No":
+        print("[Agent] User declined. Ending workflow.")
+        return {"continue_workflow": False}
+
+    print("[Agent] User accepted. Continuing workflow.")
+    return {"continue_workflow": True}
     
 
 
@@ -201,8 +175,6 @@ def recommendation_agent(state):
     # if not state.detected_task or "No Need to Detect Task" in state.detected_task:
     #     print("[Agent] No task detected – skipping recommendation.")
     #     return {"recommendation": ["No action needed"], "recommendation_options": []}
-
-
     emotion = state.average_emotion
     # task = state.detected_task
     print(f"[Agent] Processing for emotion={emotion!r}")
@@ -219,27 +191,6 @@ def recommendation_agent(state):
 
     available_apps = get_apps(conn)
     print("[Agent] Available apps:", available_apps)
-    # prompt = f"""
-    #         User feels {emotion} while working on: {task}.
-    #         Looking for 3 four-word mood-improvement suggestions.
-
-    #         Installed apps (category|name|path):
-    #         {available_apps!r}
-
-    #         Return ONLY valid JSON. No text, no notes. Output must be an array of 3 objects:
-    #         - recommendation: exactly four words
-    #         - recommendation_options: array of 2 items each with:
-    #             app_name (str),
-    #             app_url (URL or local path),
-    #             search_query (str, only for web apps),
-    #             is_local (bool)
-    #         Conditions to check seriously before returning:
-    #         - Each recommendation must have 2 app options.
-    #         - No duplicates, do not use webapp if local app is available in installed apps.
-    #         - All URLs must start with "https://" and if we can use a search query in the given app then append <search_query> token where suitable since each app search query is different from one another . 
-    #         - Each local app sets `is_local: true`.
-    #         """
-
     prompt = f"""
             You are a recommendation engine.
 
@@ -370,9 +321,11 @@ def recommendation_agent(state):
             print(f"[Agent] API returned status {res.status_code}: {res.text[:200]}")
             return {"recommendation": ["No action needed"], "recommendation_options": []}
 
-        # raw_content = res.json()["choices"][0]["message"]["content"]
         raw_content = res.json()["response"]
         print("Raw Response Content:", raw_content)
+        if not raw_content:
+            print("[Agent] No recommendations found in response.")
+            return {"recommendation": ["No action needed"], "recommendation_options": []}
 
         try:
             parsed_data = json.loads(raw_content) if isinstance(raw_content, str) else raw_content
@@ -560,3 +513,60 @@ def task_exit_agent(state):
 #     # This line runs only after user presses OK in the message box
 #     execute_task(recommendation)
 #     return {"executed": True}
+
+
+def task_detection_agent(state):
+    try:
+        if state.average_emotion == "Neutral" or state.average_emotion == "Happy" or state.average_emotion == "Surprise":
+            print("[Agent] No task detection needed for neutral emotion.")
+            return {"detected_task": "No Need to Detect Task"}
+        # Capture screenshot as a base64 string (possibly with prefix)
+        screenshot = capture_desktop()
+        if not screenshot:
+            raise ValueError("Failed to capture screenshot")
+        # Remove data URI prefix if present
+        if screenshot.startswith('data:image'):
+            screenshot = screenshot.split(',')[1]
+
+        # Validate base64 string (optional, for debugging)
+        try:
+            base64.b64decode(screenshot)
+        except Exception as decode_err:
+            raise ValueError(f"Invalid base64 screenshot: {decode_err}")
+
+        # Send the raw base64 string (no prefix) to Ollama
+        # response = ollama.generate(
+        #     model="llava:7b",
+        #     prompt="Describe user's current activity. Focus on software and tasks.",
+        #     images=[screenshot]
+        # )
+        headers = {
+            "Connection": "close",  # Disable keep-alive
+            "Content-Type": "application/json"
+        }
+        response = requests.post(
+            "https://d53cb0fd37cb.ngrok-free.app/api/generate",
+            headers=headers,
+            json={
+                "model": "llava:7b",
+                "prompt": "Describe user's current activity. Focus on software and tasks.",
+                "images": [screenshot],
+                "stream": False
+            }
+        )
+
+        # Handle HTTP errors
+        if response.status_code != 200:
+            print(f"API error ({response.status_code}): {response.text[:100]}...")
+            return {"detected_task": "unknown"}
+
+        # Parse JSON response
+        response_data = response.json()
+        detected_task = response_data.get('response', '').strip()
+        state.detected_task = detected_task
+        print(f"Detected task: {detected_task}")
+        return {"detected_task": detected_task}
+
+    except Exception as e:
+        print(f"Error detecting task: {str(e)}")
+        return {"detected_task": "unknown"}
