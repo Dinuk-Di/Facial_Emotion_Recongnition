@@ -137,7 +137,7 @@ class Dashboard:
         self.root.destroy()
 
 
-def open_dashboard(username="User"):
+def open_dashboard(username):
     root = ctk.CTk()
     Dashboard(root, username)
     root.mainloop()

@@ -3,7 +3,7 @@ import subprocess
 import time
 import threading
 import webbrowser
-from win11toast import toast
+from winotify import Notification, audio
 import urllib
 
 try:
@@ -75,7 +75,13 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         Sends toast then terminates the process.
         """
         try:
-            toast("Reminder", "Time to get back to your work")
+            toast = Notification(
+                app_id="EMOFI",  # This replaces "Python" in the header
+                title="Focus Reminder",
+                msg="Time to get back to work!",
+                icon= "assets/res/Icon.jpg" # Optional: path to .ico file
+            )
+            toast.show()
         except Exception as ntf_err:
             print(f"[Toast failed] {ntf_err}")
         # give user a moment to see it
@@ -92,7 +98,13 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         Sends toast then closes the Selenium driver/browser.
         """
         try:
-            toast("Reminder", "Time to get back to your work")
+            toast = Notification(
+                app_id="EMOFI",  # This replaces "Python" in the header
+                title="Focus Reminder",
+                msg="Time to get back to work!",
+                icon= "assets/res/Icon.jpg" # Optional: path to .ico file
+            )
+            toast.show()
         except Exception as ntf_err:
             print(f"[Toast failed] {ntf_err}")
         time.sleep(0.5)

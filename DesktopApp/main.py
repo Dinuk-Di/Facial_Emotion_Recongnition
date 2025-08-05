@@ -3,7 +3,8 @@ import subprocess
 from customtkinter import CTk
 from tkinter import messagebox
 from database.db import get_connection
-from ui.login import LoginWindow
+from ui.register import RegisterWindow
+from ui.dashboard import open_dashboard
 
 def is_do_not_disturb_enabled():
     """Check if Windows Do Not Disturb (Focus Assist) is enabled."""
@@ -63,20 +64,14 @@ def main():
 
     # Launch appropriate window based on user data
     if username and session_id:
-        app = CTk()
-        app.title(f"Welcome, {username}")
-        app.geometry("700x600")
-        app.resizable(False, False)
-
-        # Initialize dashboard with username
-        from ui.dashboard import open_dashboard
+        
         open_dashboard(username)
 
-        app.mainloop()
+        # app.mainloop()
     else:
         # Open registration window if user not found
         root = CTk()
-        app = LoginWindow(root)  # Or RegisterWindow if you prefer register on first launch
+        RegisterWindow(root)
         root.mainloop()
 
 if __name__ == "__main__":

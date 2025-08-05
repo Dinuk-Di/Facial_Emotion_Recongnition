@@ -63,7 +63,7 @@ class ChatbotPage:
         # Paths
         base_path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "res")
         user_img_path = os.path.join(base_path, "user.png")
-        bot_img_path = os.path.join(base_path, "Icon.jpg")
+        bot_img_path = os.path.join(base_path, "Icon1.jpg")
         send_icon_path = os.path.join(base_path, "send.png")
 
         # Load icons
