@@ -22,7 +22,7 @@ class Dashboard:
         self.controller = AppController(log_queue=self.log_queue)
 
         # App Icon
-        icon_path = os.path.join(os.path.dirname(__file__), "..", "assets","res", "Icon.jpg")
+        icon_path = os.path.join(os.path.dirname(__file__), "..", "assets","res", "Icon.ico")
         if os.path.exists(icon_path):
             self.root.iconbitmap(icon_path)
 
