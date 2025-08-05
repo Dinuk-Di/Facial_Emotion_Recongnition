@@ -12,7 +12,7 @@ import ctypes
 from collections import Counter
 from typing import List, Optional
 from pydantic import BaseModel
-from DesktopApp.old_utils.recommender_tools import open_recommendation
+from old_utils.recommender_tools import open_recommendation
 from old_utils.runner_interface import launch_window
 from utils.tools import open_recommendations
 from database.db import get_apps, get_connection,add_agent_recommendations
@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 import os
 import json
 from pydantic import BaseModel, Field
+from old_utils.state import AppState
 
 load_dotenv()
 
@@ -455,6 +456,7 @@ def task_execution_agent(state):
         if chosen_recommendation:
             print("Opening recommendations...")
             open_recommendations(chosen_recommendation)
+            AppState.set_executed(True)
             return {
                     "executed": True,
                 }

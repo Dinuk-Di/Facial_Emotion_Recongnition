@@ -105,11 +105,12 @@ class AppController:
             emotions = [e for e in self.emotion_log if isinstance(e, str)]
             self.log(f"[AGENT] Processing emotions: {emotions}")
             try:
-                run_agent_system(emotions)
+                results = run_agent_system(emotions)
             except Exception as e:
                 self.log(f"[AGENT ERROR] {e}")
                 traceback.print_exc()
             finally:
+                
                 self.agent_mode = False
                 self.data_buffer.clear()
                 self.emotion_log.clear()
