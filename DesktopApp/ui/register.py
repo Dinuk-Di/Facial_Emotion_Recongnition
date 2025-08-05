@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from tkinter import messagebox
-from database.db import initialize_db
+from database.db import data_initialization
 from ui.app_register import AppRegister
 import uuid
 import os
@@ -89,7 +89,7 @@ class RegisterWindow:
             messagebox.showwarning("Warning", "Please fill in all fields.")
             return
 
-        conn = initialize_db()
+        conn = data_initialization()
         try:
             conn.execute(
                 "INSERT INTO users (username, phonenumber, birthday, session_id) VALUES (?, ?, ?, ?)",

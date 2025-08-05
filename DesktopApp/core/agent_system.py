@@ -18,6 +18,9 @@ from dotenv import load_dotenv
 import os
 import json
 from pydantic import BaseModel, Field
+from winotify import Notification
+import threading
+import ctypes
 from openai import OpenAI
 
 load_dotenv()
@@ -30,7 +33,7 @@ def run_agent_system(emotions):
     initial_state = AgentState(
         emotions=emotions,
         average_emotion=None,
-        # detected_task=None,
+        
         recommendation=None,
         recommendation_options= [],
         executed=False,
@@ -75,16 +78,14 @@ def create_workflow():
     workflow.add_edge("calculate_emotion", "interrupt_check")
     workflow.add_conditional_edges(
         "interrupt_check",
-        lambda state: "continue" if state.get("continue_workflow") else "end",
-        conditions={
-            "continue": "generate_recommendation",
-            "end": END
-        }
+        lambda state: "generate_recommendation" if state.get("continue_workflow") else END,
     )
     workflow.add_edge("generate_recommendation", "execute_action")
     workflow.add_edge("execute_action", "exit_action")
     workflow.add_edge("exit_action", END)
     return workflow.compile()
+
+
 
 def average_emotion_agent(state):
     """Calculate most frequent emotion from AgentState model"""
@@ -94,6 +95,22 @@ def average_emotion_agent(state):
     counter = Counter(state.emotions)
     most_common = counter.most_common(1)[0][0]
     print(f"[Agent] Average emotion: {most_common}")
+
+    negative_emotions = ["Angry", "Sad", "Fear", "Disgust", "Stress", "Boring"]
+
+    if most_common in negative_emotions:
+        # Show notification with OK button
+        user_response = show_notification_with_ok(
+            title="Your Emotion Is Not Good",
+            message="Shall we give some suggestions to boost your mood?",
+            duration=15  # Notification auto-dismiss after 15 sec
+        )
+
+        if not user_response:  # If user didn't click OK in time
+            print("[Agent] No user response, ending workflow.")
+            # End the workflow early by setting executed=True and returning END
+            return {"average_emotion": most_common, "executed": False}  # Skip rest of workflow
+        
     return {"average_emotion": most_common}
 
 # Remove reasoning tags from the response
@@ -101,7 +118,39 @@ def clean_think_tags(text):
     cleaned_text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
     return cleaned_text.strip()
 
+def show_notification_with_ok(title, message, duration=15):
+    """
+    Show Windows notification with OK button and wait for user response.
+    Returns True if OK clicked within duration, else False.
+    """
+    # Create the notification
+    toast = Notification(app_id="EMOFI", title=title, msg=message, duration="short")
 
+    # Add OK button that triggers a callback (using protocol)
+    toast.add_actions(label="OK")
+
+    # Show notification
+    toast.show()
+
+    # Wait for a certain time for the user to click (simulate by polling a flag)
+    clicked = {"status": False}
+
+    def monitor_click():
+        # Simulate action URL check
+        # Real-world: This needs a listener or log check
+        for i in range(duration):
+            time.sleep(1)
+            # Here you'd check if the user clicked (through action callback or system log)
+            # We'll simulate by checking a file or variable
+            if clicked["status"]:
+                break
+
+    # Start monitoring in a separate thread
+    t = threading.Thread(target=monitor_click)
+    t.start()
+    t.join(timeout=duration)
+
+    return clicked["status"]
 
 
 def interrupt_check_agent(state):
@@ -112,10 +161,9 @@ def interrupt_check_agent(state):
     print(f"[Agent] Emotion is {emotion}")
 
     # Send notification and wait for user action (you can customize this)
-    user_response = send_notification(
+    user_response = show_notification_with_ok(
         title="EMOFI: Mood Check",
-        message=[f"Detected emotion: {emotion}. Do you want suggestions?"],
-        options=[["Yes", "No"]]  # customize based on your system
+        message=f"Detected emotion: {emotion}. Do you want suggestions?",
     )
 
     if user_response is None or user_response == "No":
@@ -400,8 +448,10 @@ def task_execution_agent(state):
     recommended_output = state.recommendation
     recommended_options = state.recommendation_options
     
+
     print("List of Recommendations in task_execution_agent: ", recommended_output)
     if "No action needed" not in recommended_output:
+
         chosen_recommendation = send_notification("Recommendations by EMOFI", recommended_output,recommended_options)
         print("Chosen recommendation: ", chosen_recommendation)
         if chosen_recommendation:

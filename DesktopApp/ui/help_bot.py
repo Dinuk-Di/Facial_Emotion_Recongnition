@@ -4,7 +4,12 @@ from tkinter import ttk, filedialog, scrolledtext, messagebox
 import os
 import sys   
 import os     
-from core.help_bot_logic import FileEditorAgent                                                                                                                                                                 
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # path to ui/
+PROJECT_ROOT = os.path.dirname(BASE_DIR)  # path to DesktopApp/
+sys.path.append(PROJECT_ROOT)
+
+from core.help_bot_logic import FileEditorAgent                                                                                                                                                                
 
 class FileEditorApp:
     def __init__(self, root):

@@ -36,7 +36,7 @@ def get_predictor():
 
 #     return False
 
-def check_sleepy(frame, ear_threshold: float = 0.25):
+def check_sleepy(frame, ear_threshold: float = 0.18):
     if frame is None or frame.size == 0:
         return True  # Invalid frame, assume sleepy
 

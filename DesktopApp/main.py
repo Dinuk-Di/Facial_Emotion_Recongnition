@@ -3,6 +3,7 @@ import subprocess
 from customtkinter import CTk
 from tkinter import messagebox
 from database.db import get_connection
+from database.db import initialize_db
 from ui.register import RegisterWindow
 from ui.dashboard import open_dashboard
 
@@ -54,6 +55,7 @@ def main():
     cursor = conn.cursor()
     cursor.execute("SELECT username, session_id FROM users WHERE id = 1")  # Example query
     user_data = cursor.fetchone()
+
     username, session_id = (None, None)
 
     if user_data:

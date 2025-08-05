@@ -155,16 +155,16 @@ class AppRegister:
             if os.path.exists(delete_icon_path):
                 delete_icon_img = ctk.CTkImage(light_image=Image.open(delete_icon_path), size=(20,20))
 
-            # Position tiny delete button bottom right inside icon_container
             # Replace delete button
             delete_btn = ctk.CTkButton(
                 icon_container,
                 text="",
                 image=delete_icon_img,
-                width=20,
-                height=20,
+                width=24,
+                height=24,
                 fg_color="transparent",
-                hover_color="#aa0000",
+                hover_color="#ff4444", 
+                corner_radius=1,
                 command=lambda idx=index: self.confirm_delete_app(category, idx, parent_frame)
             )
             delete_btn.place(relx=1.0, rely=1.0, anchor="se", x=-2, y=-2)
@@ -194,8 +194,6 @@ class AppRegister:
         y = (screen_height // 2) - (popup_height // 2)
         popup.geometry(f"{popup_width}x{popup_height}+{x}+{y}")
         popup.resizable(False, False)
-
-  
 
         ctk.CTkLabel(popup, text=f"Add App to '{category}'", font=("Arial", 16, "bold")).pack(pady=10)
 

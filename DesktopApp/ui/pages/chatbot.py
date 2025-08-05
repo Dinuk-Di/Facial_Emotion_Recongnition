@@ -5,6 +5,7 @@ import os
 import requests
 import json
 from dotenv import load_dotenv
+import subprocess
 
 load_dotenv()
 QWEN_API_KEY = os.getenv("QWEN_API_KEY")
@@ -60,6 +61,8 @@ class ChatbotPage:
         self.frame = ctk.CTkFrame(parent, fg_color="transparent")
         self.frame.pack_propagate(False)
 
+        self.help_bot_window = None        
+
         # Paths
         base_path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "res")
         user_img_path = os.path.join(base_path, "user.png")
@@ -70,6 +73,19 @@ class ChatbotPage:
         self.user_icon = CTkImage(light_image=Image.open(user_img_path), size=(25, 25))
         self.bot_icon = CTkImage(light_image=Image.open(bot_img_path), size=(25, 25))
         self.send_icon = CTkImage(light_image=Image.open(send_icon_path), size=(20, 20))
+
+        # ✅ Check Button for Help Bot
+        check_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
+        check_frame.pack(side="top", fill="x", pady=(5, 0))
+
+        self.help_var = ctk.BooleanVar(value=False)
+        self.help_checkbox = ctk.CTkCheckBox(
+            check_frame,
+            text="Enable Help Bot",
+            variable=self.help_var,
+            command=self.toggle_help_bot
+        )
+        self.help_checkbox.pack(side="left", padx=10, pady=5)
 
         # Main chat area
         main_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
@@ -110,6 +126,20 @@ class ChatbotPage:
 
         # Initial bot message
         self.add_message("Hi! I heard you're feeling a bit down. Let's chat and make your day better! 😊", "bot")
+
+    def toggle_help_bot(self):
+        if self.help_var.get():
+            # Open help_bot.py window
+            if self.help_bot_window is None:
+                self.help_bot_window = subprocess.Popen(
+                    ["python", "help_bot.py"],
+                    cwd=os.path.dirname(os.path.dirname(__file__)))
+        else:
+            # Close the help bot window if open
+            if self.help_bot_window:
+                self.help_bot_window.terminate()
+                self.help_bot_window = None
+
 
     def send_message(self, event=None):
         user_input = self.entry.get().strip()

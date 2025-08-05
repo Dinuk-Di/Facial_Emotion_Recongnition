@@ -14,8 +14,14 @@ def initialize_db():
     recommendation_history(conn)
     emotions(conn)
     apps(conn)
-    add_emotions(conn)
     agent_recommendations(conn)
+    return conn
+
+def data_initialization():
+    if not os.path.exists("assets"):
+        os.makedirs("assets")
+    conn = sqlite3.connect(DB_PATH)
+    add_emotions(conn)
     add_initial_apps(conn)
     return conn
 
