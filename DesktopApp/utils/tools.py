@@ -3,7 +3,7 @@ import subprocess
 import time
 import threading
 import webbrowser
-from win11toast import toast
+from winotify import Notification, audio
 import urllib
 
 try:
@@ -49,15 +49,23 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         if "<search_query>" in app_url:
             if search_query and search_query.strip():
                 encoded_query = urllib.parse.quote(search_query.strip())
-                return app_url.replace("<search_query>", encoded_query)
+                app_url = app_url.replace("<search_query>", encoded_query)
+                print("Changed App URL", app_url)
+                return app_url
             else:
-                return app_url.replace("<search_query>", "")  # remove placeholder if no query
+                app_url = app_url.replace("<search_query>", "")  # remove placeholder if no query
+                print("Changed App URL", app_url)
+                return app_url
         else:
             # If there is no placeholder, append query as ?search_query=
             if search_query and search_query.strip():
                 encoded_query = urllib.parse.quote(search_query.strip())
                 delimiter = "&" if "?" in app_url else "?"
-                return f"{app_url}{delimiter}search_query={encoded_query}"
+                app_url = f"{app_url}{delimiter}search_query={encoded_query}"
+                print("Changed App URL", app_url)
+                return app_url
+
+            print("Changed App URL", app_url)
             return app_url
 
     
@@ -67,7 +75,17 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         Sends toast then terminates the process.
         """
         try:
-            toast("Reminder", "Time to get back to your work")
+            icon_path = os.path.join(
+                os.path.dirname(__file__), "..", "assets", "res", "Icon.ico"
+            )
+            icon_path = os.path.abspath(icon_path) if os.path.exists(icon_path) else None
+            toast = Notification(
+                app_id="EMOFI",  # This replaces "Python" in the header
+                title="Focus Reminder",
+                msg="Time to get back to work!",
+                icon= icon_path
+            )
+            toast.show()
         except Exception as ntf_err:
             print(f"[Toast failed] {ntf_err}")
         # give user a moment to see it
@@ -84,7 +102,17 @@ def open_recommendations(chosen_recommendation: dict) -> str:
         Sends toast then closes the Selenium driver/browser.
         """
         try:
-            toast("Reminder", "Time to get back to your work")
+            icon_path = os.path.join(
+                os.path.dirname(__file__), "..", "assets", "res", "Icon.ico"
+            )
+            icon_path = os.path.abspath(icon_path) if os.path.exists(icon_path) else None
+            toast = Notification(
+                app_id="EMOFI",  # This replaces "Python" in the header
+                title="Focus Reminder",
+                msg="Time to get back to work!",
+                icon= icon_path
+            )
+            toast.show()
         except Exception as ntf_err:
             print(f"[Toast failed] {ntf_err}")
         time.sleep(0.5)
@@ -107,11 +135,11 @@ def open_recommendations(chosen_recommendation: dict) -> str:
             return f"Error launching local app '{app_name}': {ex}"
 
         # Schedule close + notification in 10 seconds
-        timer = threading.Timer(10.0, notify_and_close_local, args=(proc,))
+        timer = threading.Timer(20.0, notify_and_close_local, args=(proc,))
         timer.daemon = True
         timer.start()
 
-        print(f"Launched local app '{app_name}'. It will close after ~10 seconds.")
+        print(f"Launched local app '{app_name}'. It will close after ~20 seconds.")
 
         return True
 
@@ -138,11 +166,11 @@ def open_recommendations(chosen_recommendation: dict) -> str:
                 return f"Opened web app '{app_name}' via default browser (no Selenium)."
 
             # Schedule close + notification
-            timer = threading.Timer(10.0, notify_and_close_driver, args=(driver,))
+            timer = threading.Timer(20.0, notify_and_close_driver, args=(driver,))
             timer.daemon = True
             timer.start()
 
-            print(f"Opened web app '{app_name}' with Selenium. It will close after ~10 seconds.")
+            print(f"Opened web app '{app_name}' with Selenium. It will close after ~20 seconds.")
 
             return True
 
