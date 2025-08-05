@@ -17,9 +17,9 @@ class AppRegister:
         self.username = username
         
         self.root.title("Apps Settings")
-        self.root.geometry("650x800")
+        self.position_bottom_right()
+     
 
-        self.emotions = ["Fear", "Sad", "Angry", "Boring", "Stress", "Disgust"]
         self.categories = ["Songs", "Entertainment", "SocialMedia", "Games", "Communication", "Help", "Other"]
         self.category_data = {}
 
@@ -27,6 +27,17 @@ class AppRegister:
         self.main_frame.pack(padx=20, pady=20, fill="both", expand=True)
 
         self.build_ui()
+
+    def position_bottom_right(self):
+            self.root.update_idletasks()
+            width = 350
+            height = 450
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            x = screen_width - 100
+            y = screen_height - height - 20
+            self.root.geometry(f"{width}x{height}+{x}+{y}")
+            self.root.resizable(False, False)
 
     def build_ui(self):
         ctk.CTkLabel(self.main_frame, text="Configure Your Applications", font=("Arial", 20, "bold")).pack(pady=10)
