@@ -115,11 +115,11 @@ def open_recommendations(chosen_recommendation: dict) -> str:
             return f"Error launching local app '{app_name}': {ex}"
 
         # Schedule close + notification in 10 seconds
-        timer = threading.Timer(10.0, notify_and_close_local, args=(proc,))
+        timer = threading.Timer(20.0, notify_and_close_local, args=(proc,))
         timer.daemon = True
         timer.start()
 
-        print(f"Launched local app '{app_name}'. It will close after ~10 seconds.")
+        print(f"Launched local app '{app_name}'. It will close after ~20 seconds.")
 
         return True
 
@@ -146,11 +146,11 @@ def open_recommendations(chosen_recommendation: dict) -> str:
                 return f"Opened web app '{app_name}' via default browser (no Selenium)."
 
             # Schedule close + notification
-            timer = threading.Timer(10.0, notify_and_close_driver, args=(driver,))
+            timer = threading.Timer(20.0, notify_and_close_driver, args=(driver,))
             timer.daemon = True
             timer.start()
 
-            print(f"Opened web app '{app_name}' with Selenium. It will close after ~10 seconds.")
+            print(f"Opened web app '{app_name}' with Selenium. It will close after ~20 seconds.")
 
             return True
 

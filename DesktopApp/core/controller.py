@@ -61,6 +61,7 @@ class AppController:
 
         self.data_buffer = deque(maxlen=120)
         self.emotion_log = []
+        self.hand_log = []
         self.lock = threading.Lock()
         self.gpu_lock = threading.Lock()
 
@@ -102,10 +103,12 @@ class AppController:
         with self.lock:
             self.log("[AGENT] Starting agent system...")
             # Pass only emotions as a list of strings
-            emotions = [e for e in self.emotion_log if isinstance(e, str)]
-            self.log(f"[AGENT] Processing emotions: {emotions}")
+            # emotions = [e for e in self.emotion_log if isinstance(e, str)]
+            combined_log = self.get_combined_log()
+            
+            self.log(f"[AGENT] Processing {len(combined_log)} events: {combined_log}")
             try:
-                run_agent_system(emotions)
+                run_agent_system(combined_log)
             except Exception as e:
                 self.log(f"[AGENT ERROR] {e}")
                 traceback.print_exc()
@@ -118,6 +121,27 @@ class AppController:
                 self.window_start_time = time.time()
                 self.frame_count = 0
                 self.log("[AGENT] Finished")
+                
+    def get_combined_log(self):
+        """Combine logs with 70% most recent emotions and 30% most recent hands"""
+        # Calculate how many items to take from each log
+        total_emotions = len(self.emotion_log)
+        total_hands = len(self.hand_log)
+        
+        # If we don't have enough data, just combine what we have
+        if total_emotions == 0 and total_hands == 0:
+            return []
+            
+        # Calculate target counts based on 70/30 ratio
+        n_emotions = max(1, int(total_emotions * 0.7))
+        n_hands = max(1, int(total_hands * 0.3))
+        
+        # Get most recent items from each log
+        recent_emotions = list(self.emotion_log)[-n_emotions:]
+        recent_hands = list(self.hand_log)[-n_hands:]
+        
+        # Combine the results
+        return recent_emotions + recent_hands
 
     def run(self):
         self.log(f"[INFO] GPU Available: {torch.cuda.is_available()}")
@@ -166,7 +190,7 @@ class AppController:
                         if eye_closed:
                             if self.eye_closed_since is None:
                                 self.eye_closed_since = current_time
-                            elif (current_time - self.eye_closed_since >= 20) and not self.alert_triggered:
+                            elif (current_time - self.eye_closed_since >= 5) and not self.alert_triggered:
                                 self.alert_triggered = True
                                 self.buzzer_and_notify()
                         else:
@@ -209,26 +233,10 @@ class AppController:
 
                 if hand_result:
                     self.log(f"[Hand Detection] Detected: {hand_result}")
-                    self.emotion_log.extend(hand_result)
+                    self.hand_log.extend(hand_result)
                    
-                
-               
-
                 self.emotion_counter.update(emotion_result)
                 self.hand_counter.update(hand_result)
-
-
-                # if self.frame_count % 10 == 0:
-                #     top_emotion = self.emotion_counter.most_common(1)
-                #     top_hand = self.hand_counter.most_common(1)
-
-                #     if top_hand and top_hand[0][1] >= 2:
-                #         self.data_buffer.append({"type": "hand", "value": top_hand[0][0], "time": current_time})
-                #     elif top_emotion and top_emotion[0][1] >= 3:
-                #         self.data_buffer.append({"type": "emotion", "value": top_emotion[0][0], "time": current_time})
-
-                #     self.emotion_counter.clear()
-                #     self.hand_counter.clear()
 
                 if current_time - self.window_start_time >= 30 and not self.agent_mode:
                     self.agent_mode = True
@@ -238,3 +246,26 @@ class AppController:
         finally:
             self.reader_thread.stop()
             self.log("[INFO] AppController stopped.")
+            
+        def add_hand_results(self, hand_results):
+            """Add hand results while maintaining 70% emotion / 30% hand ratio"""
+            # Calculate current composition
+            total = len(self.emotion_log)
+            if total == 0:
+                self.emotion_log.extend(hand_results)
+                return
+
+            # Count emotion and hand entries
+            emotion_count = sum(1 for item in self.emotion_log if not item.startswith('hand_'))
+            hand_count = total - emotion_count
+            
+            # Calculate how many hand results we can add while maintaining ratio
+            max_hand = int(0.3 * total)  # Max hand entries for current size
+            available_slots = max(0, max_hand - hand_count)
+            
+            # Add only as many as we can while maintaining the ratio
+            if available_slots > 0:
+                to_add = hand_results[:available_slots]
+                self.emotion_log.extend(to_add)
+                if len(hand_results) > available_slots:
+                    self.log(f"[Ratio] Added {len(to_add)} hand results (max for ratio)")

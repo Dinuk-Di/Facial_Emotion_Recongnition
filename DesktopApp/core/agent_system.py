@@ -12,7 +12,6 @@ import ctypes
 from collections import Counter
 from typing import List, Optional
 from pydantic import BaseModel
-from DesktopApp.old_utils.recommender_tools import open_recommendation
 from old_utils.runner_interface import launch_window
 from utils.tools import open_recommendations
 from database.db import get_apps, get_connection,add_agent_recommendations
@@ -455,6 +454,7 @@ def task_execution_agent(state):
         if chosen_recommendation:
             print("Opening recommendations...")
             open_recommendations(chosen_recommendation)
+            state.executed = True
             return {
                     "executed": True,
                 }
@@ -465,7 +465,7 @@ def task_exit_agent(state):
         return {"executed": False, "action_time_start": None}
     print("Thread is running")
     while task_executed:
-        time.sleep(15)
+        time.sleep(20)
         task_executed = False
     print("Thread is closed")
     return {"executed": False, "action_time_start": None}

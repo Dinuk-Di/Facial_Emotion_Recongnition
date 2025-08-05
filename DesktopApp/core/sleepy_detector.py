@@ -16,7 +16,7 @@ def detect_eye_aspect_ratio(eye_points):
 def get_predictor():
     return dlib.shape_predictor("Models/shape_predictor_68_face_landmarks.dat")
 
-def check_sleepy(frame, ear_threshold: float = 0.15):
+def check_sleepy(frame, ear_threshold: float = 0.2):
     if frame is None or frame.size == 0:
         return False
 
