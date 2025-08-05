@@ -30,224 +30,149 @@ SEARCH_PATTERNS = {
     "google": "https://www.google.com/search?q={query}"
 }
 
-def open_recommendations(chosen_recommendation: dict) -> bool:
+def open_recommendations(chosen_recommendation: dict) -> tuple:
     """
-    Launches a local app or opens a web app (Selenium-based browser if available).
-    Sends a "Time to get back to work" toast and auto-closes after 10 seconds.
+    Launches a local app or opens a web app with auto-close after 20 seconds
+    Includes notification before closing
     """
     app_name = chosen_recommendation.get("app_name", "Unknown App")
     app_url = chosen_recommendation.get("app_url", "")
     search_query = chosen_recommendation.get("search_query", "")
     is_local = chosen_recommendation.get("is_local", False)
-
-    # def build_url(app_name, app_url, search_query):
-    #     if search_query:
-    #         encoded_query = urllib.parse.quote(search_query.strip())
-    #         if app_name in SEARCH_PATTERNS:
-    #             return SEARCH_PATTERNS[app_name].format(query=encoded_query)
-    #         else:
-    #             return f"{app_url}/results?search_query={encoded_query}"
-    #     return app_url
-
-    def build_url(app_url: str, search_query: str) -> str:
-        """
-        Build the full URL based on app_url and optional search_query.
-        If app_url contains '<search_query>', it will be replaced by encoded query.
-        If search_query is missing, '<search_query>' will be removed.
-        """
-        if "<search_query>" in app_url:
-            if search_query and search_query.strip():
-                encoded_query = urllib.parse.quote(search_query.strip())
-                app_url = app_url.replace("<search_query>", encoded_query)
-                print("Changed App URL", app_url)
-                return app_url
-            else:
-                app_url = app_url.replace("<search_query>", "")  # remove placeholder if no query
-                print("Changed App URL", app_url)
-                return app_url
-        else:
-            # If there is no placeholder, append query as ?search_query=
-            if search_query and search_query.strip():
-                encoded_query = urllib.parse.quote(search_query.strip())
-                delimiter = "&" if "?" in app_url else "?"
-                app_url = f"{app_url}{delimiter}search_query={encoded_query}"
-                print("Changed App URL", app_url)
-                return app_url
-
-            print("Changed App URL", app_url)
-            return app_url
-
-    def notify_and_close_local(proc):
-        """
-        Sends toast then terminates the process.
-        """
+    
+    def send_reminder_notification():
+        """Send reminder notification before closing"""
         try:
-            icon_path = os.path.join(
-                os.path.dirname(__file__), "..", "assets", "res", "Icon.ico"
-            )
+            icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "res", "Icon.ico")
             icon_path = os.path.abspath(icon_path) if os.path.exists(icon_path) else None
-            toast = Notification(
-                app_id="EMOFI",  # This replaces "Python" in the header
-                title="Focus Reminder",
-                msg="Time to get back to work!",
-                icon= icon_path
-            )
-            toast.show()
-        except Exception as ntf_err:
-            print(f"[Toast failed] {ntf_err}")
-        # give user a moment to see it
-        time.sleep(0.5)
-        try:
-            # terminate(), fallback to kill if needed
-            proc.terminate()
-            proc.wait(timeout=2)
-        except Exception:
-            proc.kill()
-
-    def notify_and_close_driver(driver):
-        """
-        Sends toast then closes the Selenium driver/browser.
-        """
-        try:
-            icon_path = os.path.join(
-                os.path.dirname(__file__), "..", "assets", "res", "Icon.ico"
-            )
-            icon_path = os.path.abspath(icon_path) if os.path.exists(icon_path) else None
+            
             toast = Notification(
                 app_id="EMOFI",
-                title="Back to Work!",
-                msg="Time to get back to work!",
-                icon= icon_path
+                title="Time's Up!",
+                msg=f"Closing {app_name} to help you focus",
+                duration="long",
+                icon=icon_path
             )
+            toast.add_actions(label="Got it")
             toast.show()
-        except Exception as ntf_err:
-            print(f"[Toast failed] {ntf_err}")
-        time.sleep(0.5)
-        try:
-            driver.quit()
+            print("[Notification] Sent reminder")
         except Exception as e:
-            print(f"[Driver quit failed] {e}")
+            print(f"[Notification Error] {e}")
+
+    def close_local_app(pid):
+        """Helper to close local app and its children"""
+        try:
+            # Send reminder notification
+            send_reminder_notification()
             
-    def launch_and_monitor_elevated(exe_path, close_after=20):
-        # Launch elevated via ShellExecuteEx
-        proc_info = shell.ShellExecuteEx(
-            lpVerb='runas',
-            lpFile=exe_path,
-            lpParameters='',
-            nShow=win32con.SW_SHOWNORMAL,
-            fMask=shellcon.SEE_MASK_NOCLOSEPROCESS
-        )
-        proc_handle = proc_info['hProcess']
-        pid = None
+            # Give user a moment to see notification
+            time.sleep(2)
+            
+            # Terminate process
+            proc = psutil.Process(pid)
+            for child in proc.children(recursive=True):
+                try:
+                    child.kill()
+                except psutil.NoSuchProcess:
+                    pass
+            proc.kill()
+            print(f"[Auto-Close] Closed local app (PID: {pid})")
+        except Exception as e:
+            print(f"[Auto-Close] Error closing app: {e}")
+
+    def close_web_driver(driver):
+        """Helper to close web driver"""
         try:
-            pid = shell.GetProcessId(proc_handle)
-        except Exception:
-            pid = None
+            # Send reminder notification
+            send_reminder_notification()
+            
+            # Give user a moment to see notification
+            time.sleep(2)
+            
+            # Close browser
+            driver.quit()
+            print("[Auto-Close] Closed web browser")
+        except Exception as e:
+            print(f"[Auto-Close] Error closing browser: {e}")
 
-        if not pid:
-            print("Failed to get PID; using handle directly")
-        else:
-            print(f"Launched elevated process PID {pid}")
-
-        # Schedule termination
-        threading.Timer(close_after, notify_and_close_elevated, args=(pid,)).start()
-        return pid
-
-    def notify_and_close_elevated(pid):
-        try:
-            Notification(app_id="EMOFI", title="Back to Work!",
-                        msg="Time to get back to work!").show()
-        except Exception as ntf:
-            print("Notification failed:", ntf)
-
-        time.sleep(0.5)
-        if pid:
-            try:
-                proc = psutil.Process(pid)
-                for child in proc.children(recursive=True):
-                    child.terminate()
-                proc.terminate()
-                gone, alive = psutil.wait_procs([proc] + proc.children(), timeout=2)
-                for p in alive:
-                    p.kill()
-                print(f"Killed elevated process PID {pid}")
-            except Exception as e:
-                print("Error killing elevated process:", e)
+    def build_url(app_url: str, search_query: str) -> str:
+        """Build full URL with search query"""
+        if "<search_query>" in app_url:
+            if search_query:
+                encoded_query = urllib.parse.quote(search_query.strip())
+                return app_url.replace("<search_query>", encoded_query)
+            return app_url.replace("<search_query>", "")
+        elif search_query:
+            delimiter = "&" if "?" in app_url else "?"
+            return f"{app_url}{delimiter}search_query={urllib.parse.quote(search_query.strip())}"
+        return app_url
 
     # 1) Local app path
     if is_local:
-        if not app_url:
-            print(f"Error: No path provided for local app '{app_name}'.")
-            return False
-        if not os.path.isfile(app_url):
-            print(f"Error: File not found for local app '{app_name}': {app_url}")
-            return False
+        if not app_url or not os.path.isfile(app_url):
+            print(f"Error: Invalid path for local app '{app_name}': {app_url}")
+            return False, None, None
 
         try:
             print(f"[Launch] {app_name} from {app_url}")
-            # proc = subprocess.Popen([app_url], shell=False)
-            win32api.ShellExecute(
-                        0,                      # hwnd: handle to parent window (0 for no parent)
-                        "open",                 # operation: "open", "print", "edit", "explore", "find"
-                        app_url,         # file: The program to execute (explorer.exe for shell:Appsfolder
-                        None,                   # parameters: The AUMID as a shell URI
-                        None,                   # directory: default directory
-                        win32con.SW_SHOWNORMAL  # show command: how the application is shown
-                    )
+            proc = subprocess.Popen([app_url])
+            pid = proc.pid
+            print(f"[Local App] Launched {app_name} with PID: {pid}")
+            
+            
+            # Start auto-close timer
+            threading.Timer(20.0, close_local_app, args=(pid,)).start()
+            
+            return True, pid, 'local'
         except Exception as ex:
-            print(f"Error launching local app '{app_name}': {ex}")
-            return False
-
-        # Schedule close + notification in 10 seconds
-        timer = threading.Timer(20.0, launch_and_monitor_elevated, args=(app_url,))
-        timer.daemon = True
-        timer.start()
-
-        print(f"Launched local app '{app_name}'. It will close after ~20 seconds.")
-
-        return True
+            print(f"Error launching local app: {ex}")
+            return False, None, None
 
     # 2) Web app
     else:
         if not app_url.startswith(("http://", "https://")):
-            print(f"Error: Invalid or missing URL for web app '{app_name}': {app_url}")
-            return False
+            print(f"Error: Invalid URL for web app '{app_name}': {app_url}")
+            return False, None, None
 
         url = build_url(app_url, search_query)
 
-        # If Selenium is available, use it to open browser so we can close
+        # Use Selenium for web apps to enable auto-close
         if _SELENIUM_AVAILABLE:
             try:
                 options = Options()
                 options.add_argument("--start-maximized")
-                # launch a separate Chrome window/process
                 driver = webdriver.Chrome(options=options)
                 driver.get(url)
-                print(f"[Selenium Open] {app_name} at {url}")
+                print(f"[Selenium] Opened {app_name} at {url}")
+                
+                # Start auto-close timer
+                threading.Timer(20.0, close_web_driver, args=(driver,)).start()
+                
+                return True, driver, 'web'
             except Exception as ex:
-                print(f"[Selenium launch failed] {ex}. Falling back to webbrowser.")
-                webbrowser.open(url)
-                toast("Reminder", f"Opened {app_name}; can't auto-close without Selenium.")
-                return f"Opened web app '{app_name}' via default browser (no Selenium)."
+                print(f"Selenium error: {ex}")
+                # Fall through to webbrowser method
 
-            # Schedule close + notification
-            timer = threading.Timer(20.0, notify_and_close_driver, args=(driver,))
-            timer.daemon = True
-            timer.start()
-
-            print(f"Opened web app '{app_name}' with Selenium. It will close after ~20 seconds.")
-
-            return True
-
-        else:
-            # No selenium installed; fallback to system default browser
+        # Fallback to default browser (no auto-close)
+        try:
+            webbrowser.open(url)
+            print(f"[Webbrowser] Opened {app_name} at {url}")
+            
+            # Send notification that we can't auto-close
             try:
-                webbrowser.open(url)
-                print(f"[Webbrowser Open] {app_name} at {url}")
-                toast("Reminder",
-                      f"Opened {app_name} via default browser; install Selenium to enable auto‑close.")
-                print(f"Opened '{app_name}' via webbrowser: {url}. No auto‑close due to missing Selenium.")
-                return True
-            except Exception as ex:
-                print(f"[Webbrowser launch failed] {ex}")
-                return False
+                toast = Notification(
+                    app_id="EMOFI",
+                    title="No Auto-Close",
+                    msg=f"Opened in default browser. Close manually when done.",
+                    duration="long"
+                )
+                toast.show()
+            except Exception:
+                pass
+            
+            return True, None, 'web'
+        except Exception as ex:
+            print(f"Webbrowser error: {ex}")
+            return False, None, None
+            
+    return False, None, None

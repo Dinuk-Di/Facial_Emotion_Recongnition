@@ -39,10 +39,13 @@ def run_agent_system(emotions):
         executed=False,
         action_executed=None,
         action_time_start=0
-        
     )
     agent_workflow = create_workflow()
-    return agent_workflow.invoke(initial_state)
+    
+    # Increase recursion limit
+    config = {"recursion_limit": 100}  # Allow up to 100 steps
+    
+    return agent_workflow.invoke(initial_state, config=config)
 
 class AppRecommendation(BaseModel):
     app_name: str = Field(description="Name of recommended application")
@@ -60,13 +63,15 @@ class AgentState(BaseModel):
     emotions: List[str]
     average_emotion: Optional[str]
     continue_workflow: Optional[bool]
-    recommendation: Optional[List[str]]  # list of suggestions
+    recommendation: Optional[List[str]]
     recommendation_options: Optional[List[List[AppRecommendation]]]
     executed: Optional[bool]
     action_executed: Optional[str]
     action_time_start: Optional[float]
-    # open_app_handle: Optional[Any] = None  # PID or driver object
-    # app_type: Optional[str] = None  # 'local' or 'web'
+    open_app_handle: Optional[Any] = None
+    app_type: Optional[str] = None
+    continue_waiting: Optional[bool] = None
+    wait_start_time: Optional[float] = None  # Track when waiting began
 
 
 def create_workflow():
@@ -75,7 +80,9 @@ def create_workflow():
     workflow.add_node("interrupt_check", interrupt_check_agent)
     workflow.add_node("generate_recommendation", recommendation_agent)
     workflow.add_node("execute_action", task_execution_agent)
+    workflow.add_node("wait_for_close", wait_for_close_agent)  # New node
     workflow.add_node("exit_action", task_exit_agent)
+    
     workflow.set_entry_point("calculate_emotion")
     workflow.add_edge("calculate_emotion", "interrupt_check")
     workflow.add_conditional_edges(
@@ -84,7 +91,12 @@ def create_workflow():
     )
     workflow.add_edge("generate_recommendation", "execute_action")
     workflow.add_conditional_edges(
-        "execute_action", lambda state: "exit_action" if state.executed else END,
+        "execute_action", 
+        lambda state: "wait_for_close" if state.executed else END,
+    )
+    workflow.add_conditional_edges(
+        "wait_for_close",
+        lambda state: "wait_for_close" if state.continue_waiting else "exit_action",
     )
     workflow.add_edge("exit_action", END)
     return workflow.compile()
@@ -475,34 +487,133 @@ def send_blocking_message(title, message):
     MB_OK = 0x0
     ctypes.windll.user32.MessageBoxW(0, message, title, MB_OK)
 
+# def task_execution_agent(state):
+#     recommended_output = state.recommendation
+#     recommended_options = state.recommendation_options
+    
+
+#     print("List of Recommendations in task_execution_agent: ", recommended_output)
+#     if "No action needed" not in recommended_output:
+
+#         chosen_recommendation = send_notification("Recommendations by EMOFI", recommended_output,recommended_options)
+#         print("Chosen recommendation: ", chosen_recommendation)
+#         if chosen_recommendation:
+#             print("Opening recommendations...")
+#             is_opened = open_recommendations(chosen_recommendation)
+#             state.executed = True
+#             return {
+#                     "executed": True,
+#                 }
+
 def task_execution_agent(state):
     recommended_output = state.recommendation
     recommended_options = state.recommendation_options
     
+    # Ensure we have recommendations to process
+    if not recommended_output or "No action needed" in recommended_output:
+        return {"executed": False}
+        
+    chosen_recommendation = send_notification(
+        "Recommendations by EMOFI", 
+        recommended_output,
+        recommended_options
+    )
+    
+    # Handle case where user didn't select anything
+    if not chosen_recommendation:
+        return {"executed": False}
+        
+    # Get open results safely
+    result = open_recommendations(chosen_recommendation)
+    if not result:
+        return {"executed": False}
+        
+    is_opened, app_handle, app_type = result
+    print("Result from open_recommendations:", is_opened, app_handle, app_type)
+    
+    # Update state only if app was opened
+    if is_opened:
+        return {
+            "executed": True,
+            "open_app_handle": app_handle,
+            "app_type": app_type,
+            "continue_waiting": True,
+            "wait_start_time": time.time()  # Record start time
+        }
+    
+    return {"executed": False}
 
-    print("List of Recommendations in task_execution_agent: ", recommended_output)
-    if "No action needed" not in recommended_output:
 
-        chosen_recommendation = send_notification("Recommendations by EMOFI", recommended_output,recommended_options)
-        print("Chosen recommendation: ", chosen_recommendation)
-        if chosen_recommendation:
-            print("Opening recommendations...")
-            is_opened = open_recommendations(chosen_recommendation)
-            state.executed = True
-            return {
-                    "executed": True,
-                }
-                    
+import psutil
+
+def wait_for_close_agent(state):
+    MAX_WAIT_SECONDS = 300  # 5 minute timeout
+    
+    # Check if we should stop waiting
+    if not state.continue_waiting or not state.open_app_handle:
+        return {"continue_waiting": False}
+    
+    # Check timeout
+    elapsed = time.time() - state.wait_start_time
+    if elapsed > MAX_WAIT_SECONDS:
+        print(f"[Agent] Wait timeout after {MAX_WAIT_SECONDS} seconds")
+        return {
+            "continue_waiting": False,
+            "open_app_handle": None,
+            "app_type": None
+        }
+        
+    # Check if app is closed
+    app_closed = False
+    
+    if state.app_type == 'local':
+        try:
+            process = psutil.Process(state.open_app_handle)
+            app_closed = not process.is_running()
+        except psutil.NoSuchProcess:
+            app_closed = True
+            
+    elif state.app_type == 'web':
+        try:
+            # This will throw if browser closed
+            state.open_app_handle.current_url
+        except Exception:
+            app_closed = True
+    
+    # Update waiting status
+    if app_closed:
+        print("[Agent] Detected app closure")
+        return {
+            "continue_waiting": False,
+            "open_app_handle": None,
+            "app_type": None
+        }
+    
+    # Wait before checking again
+    time.sleep(5)  # Increased sleep to reduce recursion
+    print(f"[Agent] Still waiting for app to close ({int(elapsed)}s elapsed)")
+    return {"continue_waiting": True}
+
+# def task_exit_agent(state):
+#     task_executed = True
+#     if not state.executed:
+#         return {"executed": False, "action_time_start": None}
+#     print("Thread is running")
+#     while task_executed:
+#         time.sleep(50)
+#         task_executed = False
+#     print("Thread is closed")
+#     return {"executed": False, "action_time_start": None}
+
 def task_exit_agent(state):
-    task_executed = True
-    if not state.executed:
-        return {"executed": False, "action_time_start": None}
-    print("Thread is running")
-    while task_executed:
-        time.sleep(50)
-        task_executed = False
-    print("Thread is closed")
-    return {"executed": False, "action_time_start": None}
+    # Reset tracking flags
+    return {
+        "executed": False,
+        "action_time_start": None,
+        "open_app_handle": None,
+        "app_type": None,
+        "continue_waiting": None
+    }
 
 
 # def recommendation_agent(state):
