@@ -16,12 +16,13 @@ from utils.tools import open_recommendations
 from database.db import get_apps, get_connection,add_agent_recommendations
 from dotenv import load_dotenv
 import os
-import json
-from pydantic import BaseModel, Field
 from winotify import Notification
 import threading
 import ctypes
 from openai import OpenAI
+import json, pickle
+from pydantic import BaseModel, Field
+from old_utils.state import app_state, pickle_load, pickle_save
 
 load_dotenv()
 
@@ -590,6 +591,353 @@ def task_exit_agent(state):
         "app_type": None,
         "continue_waiting": None
     }
+
+
+
+def parse_llm_response(text):
+    try:
+        # Clean <think> tags if present
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+
+        # Extract recommendation
+        rec_match = re.search(r'recommendation:\s*(.+)', text)
+        recommendation = rec_match.group(1).strip() if rec_match else None
+
+        # Extract recommendation_options (raw list inside [])
+        options_match = re.search(r'recommendation_options:\s*\[(.*)\]', text, re.DOTALL)
+        options_raw = options_match.group(1).strip() if options_match else ""
+
+        # Convert (app_name: 'X', ...) → {"app_name": "X", ...}
+        options = []
+        for option_text in re.findall(r'\((.*?)\)', options_raw, re.DOTALL):
+            entry = {}
+            for kv in option_text.split(','):
+                key, val = kv.split(':', 1)
+                entry[key.strip()] = val.strip().strip("'\"")
+            options.append(entry)
+
+        return recommendation, options
+
+    except Exception as e:
+        print("[Agent] Error parsing LLM response block:", e)
+        return None, []
+
+def extract_json_from_text(text):
+    try:
+        # Find JSON between ```json and ```
+        match = re.search(r'```json\s*(\{.*?\}|\[.*?\])\s*```', text, re.DOTALL)
+        if match:
+            return match.group(1)
+
+        # If no code block, try to parse whole text
+        if text.strip().startswith("{") or text.strip().startswith("["):
+            return text.strip()
+
+        raise ValueError("No valid JSON found in text.")
+    except Exception as e:
+        print("[Agent] JSON extraction failed:", e)
+        return None
+    
+def recommendation_agent(state):
+    # if not state.detected_task or "No Need to Detect Task" in state.detected_task:
+    #     print("[Agent] No task detected – skipping recommendation.")
+    #     return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+
+    emotion = state.average_emotion
+    # task = state.detected_task
+    print(f"[Agent] Processing for emotion={emotion!r}")
+
+    negative_emotions = ["Angry", "Sad", "Fear", "Disgust", "Stress", "Boring"]
+    if emotion not in negative_emotions:
+        print("[Agent] Mood is fine – no recommendation.")
+        return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+    conn = get_connection()
+    if not conn:
+        print("[Agent] DB connection failed – skip recommendation.")
+        return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+    available_apps = get_apps(conn)
+    print("[Agent] Available apps:", available_apps)
+    # prompt = f"""
+    #         User feels {emotion} while working on: {task}.
+    #         Looking for 3 four-word mood-improvement suggestions.
+
+    #         Installed apps (category|name|path):
+    #         {available_apps!r}
+
+    #         Return ONLY valid JSON. No text, no notes. Output must be an array of 3 objects:
+    #         - recommendation: exactly four words
+    #         - recommendation_options: array of 2 items each with:
+    #             app_name (str),
+    #             app_url (URL or local path),
+    #             search_query (str, only for web apps),
+    #             is_local (bool)
+    #         Conditions to check seriously before returning:
+    #         - Each recommendation must have 2 app options.
+    #         - No duplicates, do not use webapp if local app is available in installed apps.
+    #         - All URLs must start with "https://" and if we can use a search query in the given app then append <search_query> token where suitable since each app search query is different from one another . 
+    #         - Each local app sets `is_local: true`.
+    #         """
+
+    prompt = f"""
+            You are a recommendation engine.
+
+            Context:
+            - User feels: "{emotion}"
+            - Available installed apps (format: category | name | path):
+            {available_apps!r}
+
+            Goal:
+            Generate EXACTLY 3 mood-improvement suggestions, each consisting of:
+            - recommendation: A phrase of exactly FOUR words.
+            - recommendation_options: An array of EXACTLY 2 options per recommendation. Each option must include:
+                - app_name: (string)
+                - app_url: (either a valid HTTPS URL for web apps OR local file path for installed apps)
+                - search_query: (string, required only for web apps)
+                - is_local: (true if app is installed locally, false if web)
+
+            STRICT RULES:
+            1. Output ONLY valid JSON — no extra text, no explanations, no markdown.
+            2. JSON format: An array of 3 objects with keys: recommendation, recommendation_options.
+            3. Each recommendation must have TWO different apps (no duplicates across or within).
+            4. Prefer local apps over web apps if available.
+            5. For web apps:
+            - All URLs must start with "https://".
+            - Use "<search_query>" placeholder in the app_url instead of inserting actual query.
+            - Example web apps are YouTube, Spotify, Online Game (https://poki.com/), MyFlixer (https://myflixerz.to/).
+            6. For local apps:
+            - Use given path as app_url and set is_local = true.
+            - search_query is empty
+            7. Don't use same app in multiple recommendations.
+            8. Each recommendation must be exactly 4 words, meaningful, and mood-impro
+            
+
+            Example of expected structure (do NOT include this in response):
+            [
+            {{
+                "recommendation": "Take a quick break",
+                "recommendation_options": [
+                {{
+                    "app_name": "Spotify",
+                    "app_url": "https://open.spotify.com/search/<search_query>",
+                    "search_query": "relaxing music",
+                    "is_local": false
+                }},
+                {{
+                    "app_name": "KMPlayer",
+                    "app_url": "C:\\\\Program Files\\\\KMPlayer 64X\\\\KMPlayer.exe",
+                    "search_query": "",
+                    "is_local": true
+                }}
+                ]
+            }}
+            ]
+
+            Now, produce the final JSON output:
+            """
+
+
+    full_schema = RecommendationList.model_json_schema()
+
+    try:
+        # res = requests.post(
+        #     url="https://openrouter.ai/api/v1/chat/completions",
+        #     headers={
+        #         "Authorization": f"Bearer {QWEN_API_KEY}",
+        #         "Content-Type": "application/json"
+        #     },
+        #     data=json.dumps({
+        #         "model": "deepseek/deepseek-r1-0528-qwen3-8b:free",
+        #         "messages": [
+        #             {"role": "system", "content": "You are an assistant. Output must be valid JSON only."},
+        #             {"role": "user", "content": prompt}
+        #         ],
+        #         "response_format": {
+        #             "type": "json_schema",
+        #             "json_schema": {
+        #                 "name": "recommendation_list",
+        #                 "strict": True,
+        #                 "schema": full_schema
+        #             }
+        #         },
+        #         "structured_outputs": True
+        #     }
+        # ))
+
+        schema = {
+            "type": "object",
+                    "properties": {
+                        "listofRecommendations": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "recommendation": {"type": "string"},
+                                    "recommendation_options": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "app_name": {"type": "string"},
+                                                "app_url": {"type": "string"},
+                                                "search_query": {"type": "string"},
+                                                "is_local": {"type": "boolean"}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+            }
+
+        res = requests.post(
+             "https://d53cb0fd37cb.ngrok-free.app/api/generate",  # Use local endpoint
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": "qwen3:4b",
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.2},
+                "format": schema    
+            }
+        )
+
+
+        print("[Agent] API response:", res.json())
+        if res.status_code != 200:
+            print(f"[Agent] API returned status {res.status_code}: {res.text[:200]}")
+            return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        # raw_content = res.json()["choices"][0]["message"]["content"]
+        raw_content = res.json()["response"]
+        print("Raw Response Content:", raw_content)
+
+        try:
+            parsed_data = json.loads(raw_content) if isinstance(raw_content, str) else raw_content
+        except json.JSONDecodeError:
+            print("[Agent] Failed to decode JSON.")
+            return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        if "listofRecommendations" not in parsed_data or not isinstance(parsed_data["listofRecommendations"], list):
+            print("[Agent] Parsed data is not a valid list of dicts.")
+            return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        try:
+            recommendation_objects = [RecommendationResponse(**item) for item in parsed_data["listofRecommendations"]]
+            app_state.recommendations = parsed_data["listofRecommendations"]
+        except Exception as e:
+            print("[Agent] Exception parsing recommendation objects:", e)
+            return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        resp_data = RecommendationList(listofRecommendations=recommendation_objects)
+
+        # Extract recommendations
+        recommendations_list = [rec.recommendation for rec in resp_data.listofRecommendations]
+        recommendation_options_list = [rec.recommendation_options for rec in resp_data.listofRecommendations]
+
+        print("Final Recommendations:", recommendations_list)
+        print("Options:", recommendation_options_list)        
+        
+        # Update state
+        state.recommendation = recommendations_list
+        state.recommendation_options = recommendation_options_list
+
+        try:
+            for i, recommendation_type in enumerate(recommendations_list):
+                for option in recommendation_options_list[i]:
+                    recommed_app = option.app_name
+                    app_url = option.app_url
+                    search_query = option.search_query
+                    is_local = option.is_local
+
+                    add_agent_recommendations(
+                        conn,
+                        1,
+                        recommendation_type,
+                        recommed_app,
+                        app_url,
+                        search_query,
+                        is_local
+                    )
+        except Exception as e:
+            print("[Agent] Error adding recommendations to DB:", e)
+
+
+        return {
+            "recommendation": recommendations_list,
+            "recommendation_options": recommendation_options_list
+        }
+
+    except Exception as e:
+        print("[Agent] Unexpected error:", e)
+        return {
+            "recommendation": ["No action needed"],
+            "recommendation_options": [],
+            "listofRecommendations": RecommendationList(listofRecommendations=[])
+        }
+
+
+
+def send_blocking_message(title, message):
+    MB_OK = 0x0
+    ctypes.windll.user32.MessageBoxW(0, message, title, MB_OK)
+
+def task_execution_agent(state):
+    recommended_output = state.recommendation
+    recommended_options = state.recommendation_options
+    
+    print("List of Recommendations in task_execution_agent: ", recommended_output)
+    print("Recommendation Options in task_execution_agent: ", recommended_options)
+    if "No action needed" not in recommended_output:
+        app_state.executed = True
+        pickle_save()
+        print("Task executed: ", app_state.executed)
+
+        while pickle_load().executedApp == False:
+            print("waiting for reply..")
+            time.sleep(2)
+
+        selectedRecommendation = pickle_load().selectedRecommendation
+        selectedApp = pickle_load().selectedApp
+
+        chosen_recommendation = {}
+
+        for i in app_state.recommendations:
+            if(i['recommendation'] == selectedRecommendation):
+                for j in i['recommendation_options']:
+                    if(j['app_name'] == selectedApp):
+                        chosen_recommendation = j
+                        break
+                break
+
+        print("Executed task with recommendation: ", chosen_recommendation)
+
+        app_state.reset()
+        pickle_save()
+
+        #chosen_recommendation = send_notification("Recommendations by EMOFI", recommended_output,recommended_options)
+        print("Chosen recommendation: ", chosen_recommendation)
+        if chosen_recommendation:
+            print("Opening recommendations...")
+            open_recommendations(chosen_recommendation)
+            state.executed = True
+            return {
+                    "executed": True,
+                }
+                    
+def task_exit_agent(state):
+    task_executed = True
+    if not state.executed:
+        return {"executed": False, "action_time_start": None}
+    print("Thread is running")
+    while task_executed:
+        time.sleep(20)
+        task_executed = False
+    print("Thread is closed")
+    return {"executed": False, "action_time_start": None}
 
 
 # def recommendation_agent(state):
