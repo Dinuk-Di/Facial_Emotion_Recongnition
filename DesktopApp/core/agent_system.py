@@ -394,47 +394,23 @@ def recommendation_agent(state):
                     }
             }
 
-        res = requests.post(
-             "https://d53cb0fd37cb.ngrok-free.app/api/generate",  # Use local endpoint
-            headers={"Content-Type": "application/json"},
-            json={
-                "model": "qwen3:4b",
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.2},
-                "format": schema    
-            }
+        client = OpenAI()
+        
+        response = client.responses.parse(
+            model="gpt-4o-2024-08-06",
+            input=[
+                {"role": "system", "content": "Give the proper structured output."},
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            text_format=RecommendationList,
         )
 
+        print("[Agent] API response:", response.output_parsed)
 
-        print("[Agent] API response:", res.json())
-        if res.status_code != 200:
-            print(f"[Agent] API returned status {res.status_code}: {res.text[:200]}")
-            return {"recommendation": ["No action needed"], "recommendation_options": []}
-
-        raw_content = res.json()["response"]
-        print("Raw Response Content:", raw_content)
-        if not raw_content:
-            print("[Agent] No recommendations found in response.")
-            return {"recommendation": ["No action needed"], "recommendation_options": []}
-
-        try:
-            parsed_data = json.loads(raw_content) if isinstance(raw_content, str) else raw_content
-        except json.JSONDecodeError:
-            print("[Agent] Failed to decode JSON.")
-            return {"recommendation": ["No action needed"], "recommendation_options": []}
-
-        if "listofRecommendations" not in parsed_data or not isinstance(parsed_data["listofRecommendations"], list):
-            print("[Agent] Parsed data is not a valid list of dicts.")
-            return {"recommendation": ["No action needed"], "recommendation_options": []}
-
-        try:
-            recommendation_objects = [RecommendationResponse(**item) for item in parsed_data["listofRecommendations"]]
-        except Exception as e:
-            print("[Agent] Exception parsing recommendation objects:", e)
-            return {"recommendation": ["No action needed"], "recommendation_options": []}
-
-        resp_data = RecommendationList(listofRecommendations=recommendation_objects)
+        resp_data = response.output_parsed
 
         # Extract recommendations
         recommendations_list = [rec.recommendation for rec in resp_data.listofRecommendations]

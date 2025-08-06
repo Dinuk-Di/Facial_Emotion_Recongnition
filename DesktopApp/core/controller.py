@@ -115,7 +115,7 @@ class AppController:
         self.sleepy_mode = False
         self.eye_closed_since = None
         self.alert_triggered = False
-        self.sleepy_pause_until = time.time() + self.focus_time 
+        self.sleepy_pause_until = time.time() + 5
         self.data_buffer.clear()
 
     def run_agent_workflow(self):
