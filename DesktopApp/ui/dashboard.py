@@ -7,6 +7,7 @@ from ui.pages.chatbot import ChatbotPage
 from ui.pages.logs import LogsPage
 from core.controller import AppController
 from queue import Queue
+from ui.exercise import ExerciseWindow  # Adjust path if needed
 
 
 class Dashboard:
@@ -66,11 +67,14 @@ class Dashboard:
 
         play_icon = self.create_icon_button(control_bar, "▶", "#4CAF50", command=lambda: self.controller.start())
         close_icon = self.create_icon_button(control_bar, "✖", "#F44336", command=lambda: self.controller.stop())
+        yolo_icon = self.create_icon_button(control_bar, "🐤", "#FF9800", command=self.open_exercise_window)
+
 
 
         # icons should be vertically aligned
         play_icon.pack(side="top", pady=5)
         close_icon.pack(side="top", pady=5)
+        yolo_icon.pack(side="top", pady=5)
 
         # Initialize Pages
         self.pages["home"] = HomePage(self.content_frame)
@@ -81,14 +85,24 @@ class Dashboard:
         # Show Home by default
         self.show_page("home")
 
+    def open_exercise_window(self):
+        # Create a new top-level window for the exercise session
+        exercise_window = ctk.CTkToplevel(self.root)
+        exercise_window.geometry("650x550")
+        exercise_window.title("Workout Session")
+        
+        # Initialize ExerciseWindow in the new window
+        ExerciseWindow(exercise_window)
+
+
     def position_bottom_right(self):
         self.root.update_idletasks()
         width = 400
         height = 450
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        x = screen_width - 170
-        y = screen_height - height - 20
+        x = screen_width - width  - 110
+        y = screen_height - height - 220
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         self.root.resizable(False, False)
 
