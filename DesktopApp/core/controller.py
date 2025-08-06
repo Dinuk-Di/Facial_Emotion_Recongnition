@@ -446,7 +446,7 @@ class AppController:
                         if eye_closed:
                             if self.eye_closed_since is None:
                                 self.eye_closed_since = current_time
-                            elif (current_time - self.eye_closed_since >= 60) and not self.alert_triggered:
+                            elif (current_time - self.eye_closed_since >= 25) and not self.alert_triggered:
                                 self.alert_triggered = True
                                 self.buzzer_and_notify()
                         else:

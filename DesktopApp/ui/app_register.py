@@ -135,8 +135,6 @@ class AppRegister:
             self.category_data[category]["app_widgets"].append(app_frame)
 
 
-
-
     def open_add_app_popup(self, category, parent_frame):
         popup = ctk.CTkToplevel(self.root)
         popup.title("Add Application")
