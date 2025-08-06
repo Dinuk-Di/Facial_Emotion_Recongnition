@@ -74,8 +74,8 @@ class RegisterWindow:
         height = 500
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        x = screen_width - 170
-        y = screen_height - height - 20
+        x = screen_width - width  - 110
+        y = screen_height - height - 220
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         self.root.resizable(False, False)
 
