@@ -1,12 +1,15 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from database.database import init_db, save_UserData, get_user_by_username
+from database.database import init_db, save_UserData, get_user_by_username, get_user_settings, set_user_settings
 from database.db import get_connection, get_user_by_id
 from old_utils.state import app_state, pickle_save, pickle_load
 import time, threading
 from main import start_app
 from customtkinter import CTk
 from ui.register import AppRegister
+import sqlite3
+
+database_file = r'assets\app.db'
 
 app = Flask(__name__)
 CORS(app)
@@ -201,6 +204,62 @@ def add_app():
     root.mainloop()
     return jsonify({"message": "App registration window opened"}), 200
 
+#settings endpoint
+@app.route('/api/getSettings', methods=['GET'])
+def get_settings():
+    userID = 1
+    if not userID:
+        return jsonify({"error": "userID parameter is required"}), 400
+
+    settings = initial_user_settings(userID)
+    if not settings:
+        return jsonify({"error": "No settings found for user"}), 404
+
+    return jsonify({"settings": settings}), 200
+
+
+@app.route('/api/editSettings', methods=['POST'])
+def edit_settings():
+    data = request.json
+    userID = data.get('userID')
+    settings = data.get('settings')
+
+    if not all([userID, settings]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    results = []
+
+    conn = sqlite3.connect(database_file, timeout=5)  # Wait up to 5 sec
+    cursor = conn.cursor()
+
+    try:
+        for setting in settings:
+            if not all(key in setting for key in ['name', 'value']):
+                results.append({"error": f"Invalid setting format: {setting}"})
+                continue
+
+            cursor.execute(
+                    "UPDATE app_settings SET setting_value=? WHERE user_id=? AND setting_name=?",
+                    (setting['value'], userID, setting['name'])
+                )
+
+            results.append({
+                "setting": setting['name'],
+                "status": "updated",
+                "new_value": setting['value']
+            })
+
+        conn.commit()
+
+    except sqlite3.OperationalError as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+        
+    return jsonify({
+        "message": "Batch settings update complete"
+    }), 200
 
 #state management endpoints
 @app.route('/api/getExecutedState', methods=['GET'])
@@ -242,6 +301,11 @@ def set_state_init():
     pickle_save()
     return jsonify({"message": "App state reset successfully"}), 200
 
+# app ui status update
+@app.route('/api/stateUI', methods=['GET'])
+def get_state_UI():
+    return jsonify(get_system_status())
+
 def start_flask():
     app.run(debug=True, port=5000)
 
@@ -259,6 +323,30 @@ def get_execution_state():
 def get_recommendation_options():
     app_state = pickle_load()
     return app_state.recommendations
+
+def get_system_status():
+
+    app_state = pickle_load()
+
+    average_emotion = app_state.averageEmotion if app_state.averageEmotion else "Neutral"
+
+    return {
+        "system_status": database["state"]["system_status"],
+        "emotion_state": average_emotion,
+        "last_response_time": database["state"]["last_response_time"]
+    }
+
+def initial_user_settings(userID):
+    user_settings = get_user_settings(userID)
+    if not user_settings:
+        set_user_settings(userID, "theme", "light")
+        set_user_settings(userID, "systemDisable", "false")
+        set_user_settings(userID, "recommendationTime", "10")
+        set_user_settings(userID, "restTime", "25")
+        set_user_settings(userID, "appExecuteTime", "10")
+        set_user_settings(userID, "soundLevel", "Mid")
+        return get_user_settings(userID)
+    return user_settings
 
 if __name__ == '__main__':
     init_db()

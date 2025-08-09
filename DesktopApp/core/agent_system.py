@@ -22,7 +22,7 @@ from winotify import Notification
 import threading
 import ctypes
 from openai import OpenAI
-from old_utils.state import app_state, pickle_load, pickle_save
+from old_utils.state import app_state, pickle_save, pickle_load
 
 load_dotenv()
 
@@ -112,6 +112,9 @@ def average_emotion_agent(state):
     counter = Counter(state.emotions)
     most_common = counter.most_common(1)[0][0]
     print(f"[Agent] Average emotion: {most_common}")
+
+    app_state.averageEmotion = most_common
+    pickle_save()
 
     return {"average_emotion": most_common}
 
