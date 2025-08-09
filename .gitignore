@@ -17,3 +17,7 @@ venv
 dist
 build
 Setups
+*.env
+*.db
+*.pyc
+*.mp4
