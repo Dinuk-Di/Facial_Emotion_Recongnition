@@ -22,6 +22,7 @@ from winotify import Notification
 import threading
 import ctypes
 from openai import OpenAI
+from old_utils.state import app_state, pickle_save, pickle_load
 
 load_dotenv()
 
@@ -111,6 +112,9 @@ def average_emotion_agent(state):
     counter = Counter(state.emotions)
     most_common = counter.most_common(1)[0][0]
     print(f"[Agent] Average emotion: {most_common}")
+
+    app_state.averageEmotion = most_common
+    pickle_save()
 
     return {"average_emotion": most_common}
 
@@ -430,6 +434,7 @@ def recommendation_agent(state):
 
         try:
             recommendation_objects = [RecommendationResponse(**item) for item in parsed_data["listofRecommendations"]]
+            app_state.recommendations = parsed_data["listofRecommendations"]
         except Exception as e:
             print("[Agent] Exception parsing recommendation objects:", e)
             return {"recommendation": ["No action needed"], "recommendation_options": []}
