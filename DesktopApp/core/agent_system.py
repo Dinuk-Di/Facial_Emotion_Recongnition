@@ -113,6 +113,9 @@ def average_emotion_agent(state):
     most_common = counter.most_common(1)[0][0]
     print(f"[Agent] Average emotion: {most_common}")
 
+    app_state.averageEmotion = most_common
+    pickle_save()
+
     return {"average_emotion": most_common}
 
 # Remove reasoning tags from the response
