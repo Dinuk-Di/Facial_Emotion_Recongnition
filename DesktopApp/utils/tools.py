@@ -14,6 +14,64 @@ import ctypes
 import win32con
 from win32com.shell import shellcon
 import psutil
+import win32process
+
+
+
+def is_window_visible_and_has_title(hwnd):
+    return win32gui.IsWindowVisible(hwnd) and win32gui.GetWindowText(hwnd)
+
+# def get_open_apps_with_pids():
+#     apps = []
+
+#     def enum_window_callback(hwnd, _):
+#         if is_window_visible_and_has_title(hwnd):
+#             window_title = win32gui.GetWindowText(hwnd)
+#             _, pid = win32process.GetWindowThreadProcessId(hwnd)
+#             apps.append((window_title, pid))
+
+#     win32gui.EnumWindows(enum_window_callback, None)
+#     return apps
+def get_all_running_apps():
+    apps = []
+    for proc in psutil.process_iter(['pid', 'name', 'exe']):
+        try:
+            name = proc.info['name']
+            pid = proc.info['pid']
+            exe = proc.info['exe']
+            apps.append((name, pid, exe))
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    return apps
+
+# def find_pid_by_app_name(app_name):
+#     opened_apps = get_all_running_apps()
+#     for name, pid, exe in opened_apps:
+#         print(f"Name: {name}, PID: {pid}, EXE: {exe}")
+#         if app_name.lower() in name.lower():  # case-insensitive match
+#             print(f"[Local App] Found matching window '{name}' for app '{app_name}', PID: {pid}")
+#             return pid
+#     print(f"[Local App] No matching window found for app '{app_name}'")
+#     return None
+
+def find_pid_by_exe_path_match(app_name):
+    """
+    Find the PID of a running process where the executable path ends with the given app_name.
+    Matches exact filename regardless of case (e.g., notepad.exe).
+    """
+    app_name = app_name.lower()
+    for proc in psutil.process_iter(['pid', 'exe']):
+        try:
+            exe_path = proc.info['exe']
+            if exe_path and os.path.basename(exe_path).lower() == app_name:
+                print(f"[Path Match] Found PID {proc.pid} for executable '{exe_path}'")
+                return proc.pid
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    print(f"[Path Match] No matching process found for '{app_name}'")
+    return None
+
+
 
 try:
     # Selenium setup for web apps—allows controlled close
@@ -115,15 +173,26 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
 
         try:
             print(f"[Launch] {app_name} from {app_url}")
-            proc = subprocess.Popen([app_url])
-            pid = proc.pid
-            print(f"[Local App] Launched {app_name} with PID: {pid}")
-            
-            
+            # proc = subprocess.Popen([app_url])
+            # pid = None
+            # launched_pid = proc.pid
+            # print(f"[Local App] Launched {app_name} with PID: {launched_pid}")
+            shell.ShellExecuteEx(
+                    lpVerb='runas',
+                    lpFile=app_url,
+                    lpParameters='',
+                    nShow=win32con.SW_SHOWNORMAL
+                )
+            print(f"[Admin Launch] Launched: {app_url}")
+            found_pid = find_pid_by_exe_path_match(app_url)
+            if not found_pid:
+                print(f"[Local App] No matching PID found for {app_name}")
+                return False, None, None
+
             # Start auto-close timer
-            threading.Timer(20.0, close_local_app, args=(pid,)).start()
-            
-            return True, pid, 'local'
+            threading.Timer(20.0, close_local_app, args=(found_pid,)).start()
+
+            return True, found_pid, 'local'
         except Exception as ex:
             print(f"Error launching local app: {ex}")
             return False, None, None

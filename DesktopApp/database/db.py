@@ -139,6 +139,7 @@ def emotions(conn):
     """
     conn.execute(query)
     conn.commit()
+    
 def apps(conn):
     query = """
     CREATE TABLE IF NOT EXISTS apps (
@@ -147,14 +148,17 @@ def apps(conn):
         category TEXT NOT NULL CHECK(category IN (
             'Songs', 'Entertainment', 'SocialMedia', 'Games', 'Communication', 'Help', 'Other')),
         app_name TEXT NOT NULL,
+        app_id TEXT,
         app_url TEXT,
         path TEXT,
         is_local BOOLEAN NOT NULL,
+        local_type TEXT NOT NULL CHECK(local_type IN ('uwp', 'classic')),
         FOREIGN KEY (user_id) REFERENCES users (id)
     );
     """
     conn.execute(query)
     conn.commit()
+
 
 
 # Add emotion function

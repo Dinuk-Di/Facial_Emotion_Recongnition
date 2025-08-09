@@ -212,6 +212,7 @@ class AppRegister:
         
         name_entry = ctk.CTkEntry(name_frame, width=240)
         name_entry.pack(side="left", padx=(0, 5))
+        
 
         def search_installed_apps():
             name = name_entry.get().lower()
@@ -271,7 +272,8 @@ class AppRegister:
 
     # Save App Button
         def save_app():
-            name = name_entry.get()
+            #get the name as .exe name
+            name = os.path.basename(location_entry.get())
             path_val = location_entry.get()
             # selected_emotions = [emo for emo, var in emotion_vars if var.get()]
 

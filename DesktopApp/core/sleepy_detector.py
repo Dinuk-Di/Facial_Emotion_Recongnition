@@ -16,27 +16,7 @@ def detect_eye_aspect_ratio(eye_points):
 def get_predictor():
     return dlib.shape_predictor("Models/shape_predictor_68_face_landmarks.dat")
 
-# def check_sleepy(frame, ear_threshold: float = 0.25):
-#     if frame is None or frame.size == 0:
-#         return False
-
-#     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-#     face_detector = dlib.get_frontal_face_detector()
-#     shape_predictor = get_predictor()
-#     faces = face_detector(gray)
-
-#     for face in faces:
-#         landmarks = shape_predictor(gray, face)
-#         left_eye = [(landmarks.part(n).x, landmarks.part(n).y) for n in range(36, 42)]
-#         right_eye = [(landmarks.part(n).x, landmarks.part(n).y) for n in range(42, 48)]
-
-#         EAR = (detect_eye_aspect_ratio(left_eye) + detect_eye_aspect_ratio(right_eye)) / 2.0
-#         if EAR < ear_threshold:
-#             return True
-
-#     return False
-
-def check_sleepy(frame, ear_threshold: float = 0.15):
+def check_sleepy(frame, ear_threshold: float = 0.25):
     if frame is None or frame.size == 0:
         return True  # Invalid frame, assume sleepy
 

@@ -53,7 +53,7 @@ def main():
     # Connect to database and try to fetch user info
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT username, session_id FROM users WHERE id = 1")  # Example query
+    cursor.execute("SELECT username, session_id FROM users WHERE id = 1")
     user_data = cursor.fetchone()
 
     username, session_id = (None, None)
@@ -75,11 +75,6 @@ def main():
         root = CTk()
         RegisterWindow(root)
         root.mainloop()
-
-def start_app():
-    root = CTk()
-    app = LoginWindow(root)
-    root.mainloop()
 
 if __name__ == "__main__":
     main()
