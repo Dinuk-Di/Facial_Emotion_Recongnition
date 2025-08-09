@@ -343,7 +343,7 @@ class AppRegister:
                     app_id=popup.app_id,
                     app_url=None,
                     path=popup.app_path,
-                    is_local=(popup.app_type == "classic"),
+                    is_local=True,
                     app_type=popup.app_type
                 )
 

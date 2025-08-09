@@ -173,7 +173,7 @@ def add_app_data(conn, user_id, category, app_name, app_id, app_url, path, is_lo
 # get app_type, app_name and app_id only
 def get_app_data(conn, app_name):
     cursor = conn.cursor()
-    cursor.execute("SELECT app_type, app_name, app_id FROM apps WHERE app_name = ?", (app_name,))
+    cursor.execute("SELECT app_type, app_name, app_id, path FROM apps WHERE app_name = ?", (app_name,))
     return cursor.fetchone()
 
 def delete_app_data(conn, app_id: int):

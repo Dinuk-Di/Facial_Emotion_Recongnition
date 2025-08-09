@@ -56,24 +56,51 @@ def get_all_running_apps():
 #     print(f"[Local App] No matching window found for app '{app_name}'")
 #     return None
 
-def find_pid_by_exe_path_match(app_name):
-    """
-    Find the PID of a running process where the executable path ends with the given app_name.
-    Matches exact filename regardless of case (e.g., notepad.exe).
-    """
+# def find_pid_by_exe_path_match(app_name):
+#     """
+#     Find the PID of a running process where the executable path ends with the given app_name.
+#     Matches exact filename regardless of case (e.g., notepad.exe).
+#     """
+#     app_name = app_name.lower()
+#     for proc in psutil.process_iter(['pid', 'exe']):
+#         try:
+#             exe_path = proc.info['exe']
+#             if exe_path and os.path.basename(exe_path).lower() == app_name:
+#                 print(f"[Path Match] Found PID {proc.pid} for executable '{exe_path}'")
+#                 return proc.pid
+#         except (psutil.NoSuchProcess, psutil.AccessDenied):
+#             continue
+#     print(f"[Path Match] No matching process found for '{app_name}'")
+#     return None
+
+
+def get_newest_parent_pid_by_app_name(app_name):
+    """Return the newest parent PID that matches app_name."""
     app_name = app_name.lower()
-    for proc in psutil.process_iter(['pid', 'exe']):
+    candidates = []
+
+    for proc in psutil.process_iter(['pid', 'name', 'exe', 'create_time']):
         try:
-            exe_path = proc.info['exe']
-            if exe_path and os.path.basename(exe_path).lower() == app_name:
-                print(f"[Path Match] Found PID {proc.pid} for executable '{exe_path}'")
-                return proc.pid
+            name = (proc.info['name'] or "").lower()
+            exe = (proc.info['exe'] or "").lower()
+
+            if app_name in name or app_name in exe:
+                parent = proc.parent()
+                # Only include if no parent or parent's name/exe doesn't match
+                if not parent or (
+                    app_name not in (parent.name() or "").lower()
+                    and app_name not in (parent.exe() or "").lower()
+                ):
+                    candidates.append(proc)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
-    print(f"[Path Match] No matching process found for '{app_name}'")
-    return None
 
+    if not candidates:
+        return None
 
+    # Pick the newest by create_time
+    newest_proc = max(candidates, key=lambda p: p.info['create_time'])
+    return newest_proc.info['pid']
 
 try:
     # Selenium setup for web apps—allows controlled close
@@ -206,9 +233,7 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
     Launches a local app or opens a web app with auto-close after 20 seconds
     Includes notification before closing
     """
-    # get app_type from database
-    
-    
+    # get app_type from database    
     
     app_name = chosen_recommendation.get("app_name", "Unknown App")
     app_url = chosen_recommendation.get("app_url", "")
@@ -217,10 +242,11 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
     conn = get_connection()
 
     app_data = get_app_data(conn, app_name)
+    print("This is app data",app_data)
     if app_data:
-        app_type, app_name, app_id = app_data
+        app_type, app_name, app_id, path = app_data
     else:
-        app_type, app_name, app_id = "Unknown", "Unknown App", "Unknown ID"
+        app_type, app_name, app_id,path = "Unknown", "Unknown App", "Unknown ID",""
 
     def send_reminder_notification():
         """Send reminder notification before closing"""
@@ -241,42 +267,78 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
         except Exception as e:
             print(f"[Notification Error] {e}")
 
-    def close_local_app(pid):
-        """Helper to close local app and its children"""
-        try:
-            # Send reminder notification
-            send_reminder_notification()
+    # def close_local_app(pid):
+    #     """Helper to close local app and its children"""
+    #     try:
+    #         # Send reminder notification
+    #         send_reminder_notification()
             
-            # Give user a moment to see notification
-            time.sleep(2)
+    #         # Give user a moment to see notification
+    #         time.sleep(2)
             
-        #     # Terminate process
-        #     proc = psutil.Process(pid)
-        #     for child in proc.children(recursive=True):
-        #         try:
-        #             child.kill()
-        #         except psutil.NoSuchProcess:
-        #             pass
-        #     proc.kill()
-        #     print(f"[Auto-Close] Closed local app (PID: {pid})")
-        # except Exception as e:
-        #     print(f"[Auto-Close] Error closing app: {e}")
+    #     #     # Terminate process
+    #     #     proc = psutil.Process(pid)
+    #     #     for child in proc.children(recursive=True):
+    #     #         try:
+    #     #             child.kill()
+    #     #         except psutil.NoSuchProcess:
+    #     #             pass
+    #     #     proc.kill()
+    #     #     print(f"[Auto-Close] Closed local app (PID: {pid})")
+    #     # except Exception as e:
+    #     #     print(f"[Auto-Close] Error closing app: {e}")
         
-            # Using psutil to terminate the process more gracefully
+    #         # Using psutil to terminate the process more gracefully
+    #         proc = psutil.Process(pid)
+    #         proc.terminate()  # sends SIGTERM equivalent
+    #         proc.wait(timeout=5)  # wait for it to exit
+    #         print(f"Process {pid} terminated.")
+    #     except psutil.NoSuchProcess:
+    #         print(f"No process found with PID {pid}.")
+    #     except psutil.TimeoutExpired:
+    #         print(f"Process {pid} did not terminate in time, killing it.")
+    #         proc = psutil.Process(pid)
+    #         proc.kill()  # force kill
+    #     except Exception as e:
+    #         print(f"Error terminating process {pid}: {e}")
+            
+    def close_app_by_pid(pid):
+        try:
             proc = psutil.Process(pid)
-            proc.terminate()  # sends SIGTERM equivalent
-            proc.wait(timeout=5)  # wait for it to exit
-            print(f"Process {pid} terminated.")
+
+            # Get all child processes (recursively)
+            children = proc.children(recursive=True)
+
+            # Terminate children first
+            for child in children:
+                try:
+                    child.terminate()
+                except psutil.NoSuchProcess:
+                    pass
+
+            # Wait for children to terminate
+            psutil.wait_procs(children, timeout=5)
+
+            # Now terminate the main process
+            proc.terminate()
+            proc.wait(timeout=5)
+            print(f"Process {pid} and its children terminated.")
+
         except psutil.NoSuchProcess:
             print(f"No process found with PID {pid}.")
+
         except psutil.TimeoutExpired:
-            print(f"Process {pid} did not terminate in time, killing it.")
-            proc = psutil.Process(pid)
-            proc.kill()  # force kill
+            print(f"Process {pid} did not terminate in time, killing it and its children.")
+            # Kill remaining children
+            for child in children:
+                try:
+                    child.kill()
+                except psutil.NoSuchProcess:
+                    pass
+            proc.kill()
+
         except Exception as e:
             print(f"Error terminating process {pid}: {e}")
-            
-
 
     def close_web_driver(driver):
         """Helper to close web driver"""
@@ -307,13 +369,13 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
     
     def unified_app_launcher(app_info):
         try:
-            if app_info["type"] == "uwp":
+            if app_info["app_type"] == "uwp":
                 app_id = app_info["app_id"]
                 subprocess.Popen(f'explorer shell:AppsFolder\\{app_id}', shell=True)
                 print(f"[Launch] UWP app: {app_info['name']}")
                 return True
 
-            elif app_info["type"] == "classic":
+            elif app_info["app_type"] == "classic":
                 exe_path = app_info["path"]
                 if not exe_path or not os.path.isfile(exe_path):
                     print(f"[Error] Executable not found: {exe_path}")
@@ -335,11 +397,9 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
 
     # 1) Local app path
     if is_local:
-        if not app_url or not os.path.isfile(app_url):
-            print(f"Error: Invalid path for local app '{app_name}': {app_url}")
-            return False, None, None
 
         try:
+            unified_app_launcher(app_data)
             print(f"[Launch] {app_name} from {app_url}")
             # proc = subprocess.Popen([app_url])
             # pid = None
@@ -347,13 +407,13 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
             # print(f"[Local App] Launched {app_name} with PID: {launched_pid}")
             
             print(f"[Admin Launch] Launched: {app_url}")
-            found_pid = find_pid_by_exe_path_match(app_url)
+            found_pid = get_newest_parent_pid_by_app_name(app_name)
             if not found_pid:
                 print(f"[Local App] No matching PID found for {app_name}")
                 return False, None, None
 
             # Start auto-close timer
-            threading.Timer(20.0, close_local_app, args=(found_pid,)).start()
+            threading.Timer(20.0, close_app_by_pid, args=(found_pid,)).start()
 
             return True, found_pid, 'local'
         except Exception as ex:
