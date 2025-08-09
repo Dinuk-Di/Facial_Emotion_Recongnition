@@ -8,6 +8,7 @@ class AppState:
         self.recommendation_outputs = []
         self.selectedApp = ""
         self.selectedRecommendation = ""
+        self.averageEmotion = ""
 
     def reset(self):
         self.__init__() 
