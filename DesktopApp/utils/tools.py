@@ -16,6 +16,7 @@ from win32com.shell import shellcon
 import customtkinter as ctk
 import psutil
 import win32process
+from database.db import get_app_data,get_connection
 
 
 
@@ -205,11 +206,22 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
     Launches a local app or opens a web app with auto-close after 20 seconds
     Includes notification before closing
     """
+    # get app_type from database
+    
+    
+    
     app_name = chosen_recommendation.get("app_name", "Unknown App")
     app_url = chosen_recommendation.get("app_url", "")
     search_query = chosen_recommendation.get("search_query", "")
     is_local = chosen_recommendation.get("is_local", False)
-    
+    conn = get_connection()
+
+    app_data = get_app_data(conn, app_name)
+    if app_data:
+        app_type, app_name, app_id = app_data
+    else:
+        app_type, app_name, app_id = "Unknown", "Unknown App", "Unknown ID"
+
     def send_reminder_notification():
         """Send reminder notification before closing"""
         try:
@@ -238,17 +250,33 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
             # Give user a moment to see notification
             time.sleep(2)
             
-            # Terminate process
+        #     # Terminate process
+        #     proc = psutil.Process(pid)
+        #     for child in proc.children(recursive=True):
+        #         try:
+        #             child.kill()
+        #         except psutil.NoSuchProcess:
+        #             pass
+        #     proc.kill()
+        #     print(f"[Auto-Close] Closed local app (PID: {pid})")
+        # except Exception as e:
+        #     print(f"[Auto-Close] Error closing app: {e}")
+        
+            # Using psutil to terminate the process more gracefully
             proc = psutil.Process(pid)
-            for child in proc.children(recursive=True):
-                try:
-                    child.kill()
-                except psutil.NoSuchProcess:
-                    pass
-            proc.kill()
-            print(f"[Auto-Close] Closed local app (PID: {pid})")
+            proc.terminate()  # sends SIGTERM equivalent
+            proc.wait(timeout=5)  # wait for it to exit
+            print(f"Process {pid} terminated.")
+        except psutil.NoSuchProcess:
+            print(f"No process found with PID {pid}.")
+        except psutil.TimeoutExpired:
+            print(f"Process {pid} did not terminate in time, killing it.")
+            proc = psutil.Process(pid)
+            proc.kill()  # force kill
         except Exception as e:
-            print(f"[Auto-Close] Error closing app: {e}")
+            print(f"Error terminating process {pid}: {e}")
+            
+
 
     def close_web_driver(driver):
         """Helper to close web driver"""
@@ -276,6 +304,34 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
             delimiter = "&" if "?" in app_url else "?"
             return f"{app_url}{delimiter}search_query={urllib.parse.quote(search_query.strip())}"
         return app_url
+    
+    def unified_app_launcher(app_info):
+        try:
+            if app_info["type"] == "uwp":
+                app_id = app_info["app_id"]
+                subprocess.Popen(f'explorer shell:AppsFolder\\{app_id}', shell=True)
+                print(f"[Launch] UWP app: {app_info['name']}")
+                return True
+
+            elif app_info["type"] == "classic":
+                exe_path = app_info["path"]
+                if not exe_path or not os.path.isfile(exe_path):
+                    print(f"[Error] Executable not found: {exe_path}")
+                    return False
+                
+                shell.ShellExecuteEx(
+                        lpVerb='runas',
+                        lpFile=exe_path,
+                        lpParameters='',
+                        nShow=win32con.SW_SHOWNORMAL
+                )
+                print(f"[Launch] Classic app as Admin: {exe_path}")
+                return True
+
+        except Exception as e:
+            print(f"[Launch Error] {e}")
+            return False
+
 
     # 1) Local app path
     if is_local:
@@ -289,12 +345,7 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
             # pid = None
             # launched_pid = proc.pid
             # print(f"[Local App] Launched {app_name} with PID: {launched_pid}")
-            shell.ShellExecuteEx(
-                    lpVerb='runas',
-                    lpFile=app_url,
-                    lpParameters='',
-                    nShow=win32con.SW_SHOWNORMAL
-                )
+            
             print(f"[Admin Launch] Launched: {app_url}")
             found_pid = find_pid_by_exe_path_match(app_url)
             if not found_pid:

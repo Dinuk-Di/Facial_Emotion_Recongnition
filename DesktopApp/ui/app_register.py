@@ -180,12 +180,6 @@ class AppRegister:
         popup = ctk.CTkToplevel(self.root)
         popup.title("Add Application")
 
-         # ✅ Load Emofi Icon
-        emofi_icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "res", "Icon.jpg")
-        emofi_icon_img = None
-        if os.path.exists(emofi_icon_path):
-            emofi_icon_img = ctk.CTkImage(light_image=Image.open(emofi_icon_path), size=(40, 40))
-
         popup_width, popup_height = 350, 300
         screen_width = popup.winfo_screenwidth()
         screen_height = popup.winfo_screenheight()
@@ -196,86 +190,49 @@ class AppRegister:
 
         ctk.CTkLabel(popup, text=f"Add App to '{category}'", font=("Arial", 16, "bold")).pack(pady=10)
 
-        # App Name Entry
-        ctk.CTkLabel(
-            popup,
-            text="Type the name then click search button.\nIf location is not detected, browse manually.",
-            font=("Arial", 11),
-            text_color="gray",
-            wraplength=350,
-            justify="center"
-        ).pack(pady=(0, 15))
-
+        # Name entry
         ctk.CTkLabel(popup, text="App Name:").pack(anchor="w", padx=20)
         name_frame = ctk.CTkFrame(popup)
         name_frame.pack(pady=5)
-
-        
         name_entry = ctk.CTkEntry(name_frame, width=240)
         name_entry.pack(side="left", padx=(0, 5))
-        
 
-        # def search_installed_apps():
-        #     name = name_entry.get().lower()
-        #     matches = [app for app in self.get_installed_programs() if name in app[0].lower()]
-        #     if matches:
-        #         install_location = matches[0][1]
-        #         exe_path = find_executable_in_folder(install_location)
-        #         location_entry.delete(0, "end")
-        #         if exe_path:
-        #             location_entry.insert(0, exe_path)
-        #         else:
-        #             location_entry.insert(0, install_location)  # fallback to folder
-        #             messagebox.showinfo("Executable Not Found", "App found, but .exe file not located.")
-        #     else:
-        #         messagebox.showinfo("Not Found", "App not found. Please enter path manually.")
+        # Location entry
+        ctk.CTkLabel(popup, text="App Location / ID:").pack(anchor="w", padx=20)
+        location_frame = ctk.CTkFrame(popup)
+        location_frame.pack(pady=5)
+        location_entry = ctk.CTkEntry(location_frame, width=240)
+        location_entry.pack(side="left", padx=(0, 5))
 
-        # def find_executable_in_folder(folder_path):
-        #     if not os.path.isdir(folder_path):
-        #         return None
+        def browse_file():
+            path = filedialog.askopenfilename()
+            if path:
+                location_entry.delete(0, "end")
+                location_entry.insert(0, path)
+                popup.app_type = "classic"
+                popup.app_id = None
+                popup.app_path = path
 
-        #     exe_files = []
-        #     for root, dirs, files in os.walk(folder_path):
-        #         for file in files:
-        #             if file.lower().endswith(".exe"):
-        #                 exe_files.append(os.path.join(root, file))
+        browse_btn = ctk.CTkButton(location_frame, text="📁", width=40, command=browse_file)
+        browse_btn.pack(side="left")
 
-        #     # Optionally: filter or rank executables to find the main one
-        #     if exe_files:
-        #         # Example: return the shortest path or the one that matches folder name
-        #         exe_files.sort(key=lambda x: len(x))  # heuristic: shortest path = most likely
-        #         return exe_files[0]
-
-        #     return None
-
+        # ---------- Search Logic ----------
         def find_executable_in_folder(folder_path):
             if not os.path.isdir(folder_path):
                 return None
-
             exe_files = []
             for root, dirs, files in os.walk(folder_path):
                 for file in files:
                     if file.lower().endswith(".exe"):
                         exe_files.append(os.path.join(root, file))
-
-            if exe_files:
-                exe_files.sort(key=lambda x: len(x))
-                return exe_files[0]
-
-            return None
+            return exe_files[0] if exe_files else None
 
         def get_classic_installed_programs():
-            """
-            Returns a list of tuples: (DisplayName, InstallLocation)
-            """
-            import winreg
-
             uninstall_keys = [
                 r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
                 r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
             ]
             results = []
-
             for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
                 for subkey in uninstall_keys:
                     try:
@@ -285,7 +242,11 @@ class AppRegister:
                                     subkey_name = winreg.EnumKey(key, i)
                                     with winreg.OpenKey(key, subkey_name) as app_key:
                                         name = winreg.QueryValueEx(app_key, "DisplayName")[0]
-                                        location = winreg.QueryValueEx(app_key, "InstallLocation")[0] if "InstallLocation" in [winreg.EnumValue(app_key, j)[0] for j in range(winreg.QueryInfoKey(app_key)[1])] else ""
+                                        location = ""
+                                        try:
+                                            location = winreg.QueryValueEx(app_key, "InstallLocation")[0]
+                                        except:
+                                            pass
                                         if name:
                                             results.append((name, location))
                                 except:
@@ -295,7 +256,6 @@ class AppRegister:
             return results
 
         def get_installed_uwp_apps():
-            """Returns a list of (AppName, AppUserModelID) using PowerShell"""
             try:
                 command = [
                     "powershell",
@@ -311,71 +271,65 @@ class AppRegister:
                         name, app_id = line.split("|", 1)
                         apps.append((name.strip(), app_id.strip()))
                 return apps
-            except subprocess.CalledProcessError as e:
-                print(f"[UWP Fetch Error] PowerShell returned error code {e.returncode}")
-                print(f"Output: {e.output}")
-                return []
-            except Exception as e:
-                print(f"[UWP Fetch Exception] {e}")
+            except:
                 return []
 
-        def search_installed_apps(name_input):
-            name = name_input.lower()
+        def search_installed_apps():
+            name = name_entry.get().lower().strip()
+            if not name:
+                messagebox.showwarning("Missing", "Enter app name before searching")
+                return
 
-            # Search UWP apps
+            # Try UWP
             uwp_matches = [app for app in get_installed_uwp_apps() if name in app[0].lower()]
             if uwp_matches:
-                print(f"[Match] Found UWP app: {uwp_matches[0][0]}")
-                return {"type": "uwp", "name": uwp_matches[0][0], "app_id": uwp_matches[0][1]}
+                app_name, app_id = uwp_matches[0]
+                location_entry.delete(0, "end")
+                location_entry.insert(0, app_id)
+                popup.app_type = "uwp"
+                popup.app_id = app_id
+                popup.app_path = None
+                messagebox.showinfo("Found", f"UWP App Found: {app_name}")
+                return
 
-            # Search classic apps
+            # Try Classic
             classic_matches = [app for app in get_classic_installed_programs() if name in app[0].lower()]
             if classic_matches:
-                install_location = classic_matches[0][1]
-                exe_path = find_executable_in_folder(install_location)
-                return {"type": "classic", "name": classic_matches[0][0], "path": exe_path or install_location}
+                app_name, install_location = classic_matches[0]
+                exe_path = find_executable_in_folder(install_location) or install_location
+                location_entry.delete(0, "end")
+                location_entry.insert(0, exe_path)
+                popup.app_type = "classic"
+                popup.app_id = None
+                popup.app_path = exe_path
+                messagebox.showinfo("Found", f"Classic App Found: {app_name}")
+                return
 
-            return None
+            messagebox.showwarning("Not Found", "App not found, please browse manually.")
 
         search_btn = ctk.CTkButton(name_frame, text="🔍", width=40, command=search_installed_apps)
         search_btn.pack(side="left")
 
-        # App Location Entry
-        ctk.CTkLabel(popup, text="App Location:").pack(anchor="w", padx=20)
-        location_frame = ctk.CTkFrame(popup)
-        location_frame.pack(pady=5)
-
-        location_entry = ctk.CTkEntry(location_frame, width=240)
-        location_entry.pack(side="left", padx=(0, 5))
-
-        def browse_file():
-            path = filedialog.askopenfilename()
-            if path:
-                location_entry.delete(0, "end")
-                location_entry.insert(0, path)
-
-        browse_btn = ctk.CTkButton(location_frame, text="📁", width=40, command=browse_file)
-        browse_btn.pack(side="left")
-
-        
-
-    # Save App Button
+        # ---------- Save ----------
         def save_app():
-            #get the name as .exe name
-            name = os.path.basename(location_entry.get())
-            path_val = location_entry.get()
-            # selected_emotions = [emo for emo, var in emotion_vars if var.get()]
-
-            if not name:
+            app_name = name_entry.get().strip()
+            if not app_name:
                 messagebox.showwarning("Missing", "Please enter app name")
                 return
 
-            is_local = bool(path_val)
-            app_url = None
+            # If user browsed manually and didn't search
+            if not hasattr(popup, "app_type"):
+                path_val = location_entry.get().strip()
+                if not path_val:
+                    messagebox.showwarning("Missing", "Please select app location or search")
+                    return
+                popup.app_type = "classic"
+                popup.app_id = None
+                popup.app_path = path_val
 
-            self.category_data[category]["apps"].append((name, path_val))
+            # Store in DB
+            self.category_data[category]["apps"].append((app_name, popup.app_path or popup.app_id))
             conn = get_connection()
-
             try:
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM users WHERE username = ?", (self.username,))
@@ -385,16 +339,17 @@ class AppRegister:
                     conn=conn,
                     user_id=user_id,
                     category=category,
-                    app_name=name,
-                    app_url=app_url,
-                    path=path_val,
-                    is_local=is_local
+                    app_name=app_name,
+                    app_id=popup.app_id,
+                    app_url=None,
+                    path=popup.app_path,
+                    is_local=(popup.app_type == "classic"),
+                    app_type=popup.app_type
                 )
 
                 messagebox.showinfo("Success", "App added successfully.")
                 popup.destroy()
                 self.update_app_list(category, parent_frame)
-
             except Exception as e:
                 messagebox.showerror("Database Error", f"Failed to add app: {e}")
                 print(f"[DB Error] {e}")
@@ -402,25 +357,6 @@ class AppRegister:
         ctk.CTkButton(popup, text="Add", command=save_app).pack(pady=15)
 
 
-
-    def get_installed_programs(self):
-        uninstall_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-        program_paths = []
-        for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
-            try:
-                with winreg.OpenKey(root, uninstall_key) as key:
-                        for i in range(0, winreg.QueryInfoKey(key)[0]):
-                            subkey_name = winreg.EnumKey(key, i)
-                            with winreg.OpenKey(key, subkey_name) as subkey:
-                                try:
-                                    display_name = winreg.QueryValueEx(subkey, "DisplayName")[0]
-                                    install_location = winreg.QueryValueEx(subkey, "InstallLocation")[0]
-                                    program_paths.append((display_name, install_location))
-                                except FileNotFoundError:
-                                    continue
-            except FileNotFoundError:
-                    continue
-        return program_paths
 
     def submit(self):
         collected_data = {}

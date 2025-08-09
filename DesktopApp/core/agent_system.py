@@ -497,37 +497,37 @@ def task_execution_agent(state):
         return {"executed": False}
     if "No action needed" not in recommended_output:
         app_state.executed = True
-        pickle_save()
-        print("Task executed: ", app_state.executed)
+        # pickle_save()
+        # print("Task executed: ", app_state.executed)
 
-        while pickle_load().executedApp == False:
-            print("waiting for reply..")
-            time.sleep(2)
+        # while pickle_load().executedApp == False:
+        #     print("waiting for reply..")
+        #     time.sleep(2)
 
-        selectedRecommendation = pickle_load().selectedRecommendation
-        selectedApp = pickle_load().selectedApp
+        # selectedRecommendation = pickle_load().selectedRecommendation
+        # selectedApp = pickle_load().selectedApp
 
-        chosen_recommendation = {}
+        # chosen_recommendation = {}
 
-        for i in app_state.recommendations:
-            if(i['recommendation'] == selectedRecommendation):
-                for j in i['recommendation_options']:
-                    if(j['app_name'] == selectedApp):
-                        chosen_recommendation = j
-                        break
-                break
+        # for i in app_state.recommendations:
+        #     if(i['recommendation'] == selectedRecommendation):
+        #         for j in i['recommendation_options']:
+        #             if(j['app_name'] == selectedApp):
+        #                 chosen_recommendation = j
+        #                 break
+        #         break
 
-        print("Executed task with recommendation: ", chosen_recommendation)
+        # print("Executed task with recommendation: ", chosen_recommendation)
 
-        app_state.reset()
-        pickle_save()
+        # app_state.reset()
+        # pickle_save()
     
         
-    # chosen_recommendation = send_notification(
-    #     "Recommendations by EMOFI", 
-    #     recommended_output,
-    #     recommended_options
-    # )
+    chosen_recommendation = send_notification(
+        "Recommendations by EMOFI", 
+        recommended_output,
+        recommended_options
+    )
     
     # Handle case where user didn't select anything
     if not chosen_recommendation:

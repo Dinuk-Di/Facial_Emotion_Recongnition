@@ -162,13 +162,19 @@ def add_emotions(conn):
         cursor.execute("INSERT INTO emotions (emotion, is_positive) VALUES (?, ?)", (emotion, is_positive))
     conn.commit()
 
-def add_app_data(conn, user_id, category, app_name, app_url, path, is_local):
+def add_app_data(conn, user_id, category, app_name, app_id, app_url, path, is_local, app_type):
     cursor = conn.cursor()
     cursor.execute("""
-            INSERT INTO apps (user_id, category, app_name, app_url, path, is_local)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (user_id, category, app_name, app_url, path, is_local))
+            INSERT INTO apps (user_id, category, app_name, app_id, app_url, path, is_local, app_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, category, app_name, app_id, app_url, path, is_local, app_type))
     conn.commit()
+
+# get app_type, app_name and app_id only
+def get_app_data(conn, app_name):
+    cursor = conn.cursor()
+    cursor.execute("SELECT app_type, app_name, app_id FROM apps WHERE app_name = ?", (app_name,))
+    return cursor.fetchone()
 
 def delete_app_data(conn, app_id: int):
     """
@@ -194,7 +200,7 @@ def apps(conn):
         app_url TEXT,
         path TEXT,
         is_local BOOLEAN NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('uwp', 'classic','web')),
+        app_type TEXT NOT NULL CHECK(app_type IN ('uwp', 'classic','web')),
         FOREIGN KEY (user_id) REFERENCES users (id)
     );
     """
@@ -222,7 +228,7 @@ def add_initial_apps(conn):
 
     cursor = conn.cursor()
     cursor.executemany("""
-        INSERT INTO apps (user_id, category, app_name, app_url, app_id, path, is_local,type)
+        INSERT INTO apps (user_id, category, app_name, app_url, app_id, path, is_local, app_type)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, initial_apps)
     conn.commit()
