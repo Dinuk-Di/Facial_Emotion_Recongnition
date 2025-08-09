@@ -42,23 +42,7 @@ def create_users_table(conn):
     """
     conn.execute(query)
     conn.commit()
-
-def get_user_by_id(user_id: int):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-    user = cursor.fetchone()
-    conn.close()
-    return user
-
-def get_user_by_credentials(username: str, password: str):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
-    user = cursor.fetchone()
-    conn.close()
-    return user
-
+    
 def app_settings(conn):
     query = """
     CREATE TABLE IF NOT EXISTS app_settings (
@@ -110,23 +94,6 @@ def recommendation_history(conn):
     );
     """
     conn.execute(query)
-    conn.commit()
-
-def recommendation_history_main():
-    conn = get_connection()
-    query = """
-    CREATE TABLE IF NOT EXISTS recommendation_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        emotion TEXT NOT NULL,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        selected_previous_recommendation TEXT,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    );
-    """
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM apps ORDER BY id DESC LIMIT 10")
-    all_data = cursor.fetchall()
     conn.commit()
 
 def emotions(conn):
