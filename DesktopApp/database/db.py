@@ -140,24 +140,6 @@ def emotions(conn):
     conn.execute(query)
     conn.commit()
     
-def apps(conn):
-    query = """
-    CREATE TABLE IF NOT EXISTS apps (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        category TEXT NOT NULL CHECK(category IN (
-            'Songs', 'Entertainment', 'SocialMedia', 'Games', 'Communication', 'Help', 'Other')),
-        app_name TEXT NOT NULL,
-        app_id TEXT,
-        app_url TEXT,
-        path TEXT,
-        is_local BOOLEAN NOT NULL,
-        local_type TEXT NOT NULL CHECK(local_type IN ('uwp', 'classic')),
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    );
-    """
-    conn.execute(query)
-    conn.commit()
 
 
 
@@ -199,29 +181,49 @@ def delete_app_data(conn, app_id: int):
     cursor.execute("DELETE FROM apps WHERE id = ?", (app_id,))
     conn.commit()
 
+
+def apps(conn):
+    query = """
+    CREATE TABLE IF NOT EXISTS apps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        category TEXT NOT NULL CHECK(category IN (
+            'Songs', 'Entertainment', 'SocialMedia', 'Games', 'Communication', 'Help', 'Other')),
+        app_name TEXT NOT NULL,
+        app_id TEXT,
+        app_url TEXT,
+        path TEXT,
+        is_local BOOLEAN NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('uwp', 'classic','web')),
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    );
+    """
+    conn.execute(query)
+    conn.commit()
+
 def add_initial_apps(conn):
     """
     Adds initial apps to the database.
     """
     initial_apps = [
-        (1, 'Games', 'Subway Surfers', None, 'https://poki.com/en/g/subway-surfers', False),
-        (1, 'Games', 'Brain Test', None, 'https://poki.com/en/g/brain-test-tricky-puzzles', False),
-        (1, 'Games', 'Bike Game', None, 'https://poki.com/en/g/stunt-bike-extreme', False),
-        (1,'Entertainment', 'YouTube', None, 'https://www.youtube.com', False),
-        (1,'Entertainment', 'Films', None, 'https://myflixerz.to/', False),
-        (1,'Songs', 'Spotify', None, 'https://open.spotify.com/', False),
-        (1,'Songs', 'SoundCloud', None, 'https://soundcloud.com/', False),
-        (1,'SocialMedia','WhatsApp',None,'https://web.whatsapp.com/',False),
-        (1,'SocialMedia','Facebook',None,'https://www.facebook.com/',False),
-        (1,'Help','ChatGPT',None,'https://chatgpt.com/',False),
-        (1,'Help','Perplexity',None,'https://www.perplexity.ai/',False)
-        
+        (1, 'Games', 'Subway Surfers', None, 'https://poki.com/en/g/subway-surfers',None, False,'web'),
+        (1, 'Games', 'Brain Test', None, 'https://poki.com/en/g/brain-test-tricky-puzzles', None,False,'web'),
+        (1, 'Games', 'Bike Game', None, 'https://poki.com/en/g/stunt-bike-extreme',None, False,'web'),
+        (1,'Entertainment', 'YouTube', None, 'https://www.youtube.com', None,False,'web'),
+        (1,'Entertainment', 'Films', None, 'https://myflixerz.to/', None,False,'web'),
+        (1,'Songs', 'Spotify', None, 'https://open.spotify.com/', None,False,'web'),
+        (1,'Songs', 'SoundCloud', None, 'https://soundcloud.com/', None,False,'web'),
+        (1,'SocialMedia','WhatsApp',None,'https://web.whatsapp.com/',None, False,'web'),
+        (1,'SocialMedia','Facebook',None,'https://www.facebook.com/',None, False,'web'),
+        (1,'Help','ChatGPT',None,'https://chatgpt.com/',None,False,'web'),
+        (1,'Help','Perplexity',None,'https://www.perplexity.ai/',None,False,'web')
+
     ]
 
     cursor = conn.cursor()
     cursor.executemany("""
-        INSERT INTO apps (user_id, category, app_name, app_url, path, is_local)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO apps (user_id, category, app_name, app_url, app_id, path, is_local,type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, initial_apps)
     conn.commit()
 

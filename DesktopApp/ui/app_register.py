@@ -5,6 +5,7 @@ from database.db import get_connection, add_app_data
 import os
 from PIL import Image, ImageDraw
 from ui.dashboard import open_dashboard
+import subprocess
 
 ASSET_PATH = "assets/res"
 
@@ -214,20 +215,38 @@ class AppRegister:
         name_entry.pack(side="left", padx=(0, 5))
         
 
-        def search_installed_apps():
-            name = name_entry.get().lower()
-            matches = [app for app in self.get_installed_programs() if name in app[0].lower()]
-            if matches:
-                install_location = matches[0][1]
-                exe_path = find_executable_in_folder(install_location)
-                location_entry.delete(0, "end")
-                if exe_path:
-                    location_entry.insert(0, exe_path)
-                else:
-                    location_entry.insert(0, install_location)  # fallback to folder
-                    messagebox.showinfo("Executable Not Found", "App found, but .exe file not located.")
-            else:
-                messagebox.showinfo("Not Found", "App not found. Please enter path manually.")
+        # def search_installed_apps():
+        #     name = name_entry.get().lower()
+        #     matches = [app for app in self.get_installed_programs() if name in app[0].lower()]
+        #     if matches:
+        #         install_location = matches[0][1]
+        #         exe_path = find_executable_in_folder(install_location)
+        #         location_entry.delete(0, "end")
+        #         if exe_path:
+        #             location_entry.insert(0, exe_path)
+        #         else:
+        #             location_entry.insert(0, install_location)  # fallback to folder
+        #             messagebox.showinfo("Executable Not Found", "App found, but .exe file not located.")
+        #     else:
+        #         messagebox.showinfo("Not Found", "App not found. Please enter path manually.")
+
+        # def find_executable_in_folder(folder_path):
+        #     if not os.path.isdir(folder_path):
+        #         return None
+
+        #     exe_files = []
+        #     for root, dirs, files in os.walk(folder_path):
+        #         for file in files:
+        #             if file.lower().endswith(".exe"):
+        #                 exe_files.append(os.path.join(root, file))
+
+        #     # Optionally: filter or rank executables to find the main one
+        #     if exe_files:
+        #         # Example: return the shortest path or the one that matches folder name
+        #         exe_files.sort(key=lambda x: len(x))  # heuristic: shortest path = most likely
+        #         return exe_files[0]
+
+        #     return None
 
         def find_executable_in_folder(folder_path):
             if not os.path.isdir(folder_path):
@@ -239,15 +258,85 @@ class AppRegister:
                     if file.lower().endswith(".exe"):
                         exe_files.append(os.path.join(root, file))
 
-            # Optionally: filter or rank executables to find the main one
             if exe_files:
-                # Example: return the shortest path or the one that matches folder name
-                exe_files.sort(key=lambda x: len(x))  # heuristic: shortest path = most likely
+                exe_files.sort(key=lambda x: len(x))
                 return exe_files[0]
 
             return None
 
-        
+        def get_classic_installed_programs():
+            """
+            Returns a list of tuples: (DisplayName, InstallLocation)
+            """
+            import winreg
+
+            uninstall_keys = [
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+            ]
+            results = []
+
+            for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                for subkey in uninstall_keys:
+                    try:
+                        with winreg.OpenKey(root, subkey) as key:
+                            for i in range(0, winreg.QueryInfoKey(key)[0]):
+                                try:
+                                    subkey_name = winreg.EnumKey(key, i)
+                                    with winreg.OpenKey(key, subkey_name) as app_key:
+                                        name = winreg.QueryValueEx(app_key, "DisplayName")[0]
+                                        location = winreg.QueryValueEx(app_key, "InstallLocation")[0] if "InstallLocation" in [winreg.EnumValue(app_key, j)[0] for j in range(winreg.QueryInfoKey(app_key)[1])] else ""
+                                        if name:
+                                            results.append((name, location))
+                                except:
+                                    continue
+                    except:
+                        continue
+            return results
+
+        def get_installed_uwp_apps():
+            """Returns a list of (AppName, AppUserModelID) using PowerShell"""
+            try:
+                command = [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy", "Bypass",
+                    "-Command",
+                    "Get-StartApps | ForEach-Object { \"$($_.Name)|$($_.AppID)\" }"
+                ]
+                output = subprocess.check_output(command, text=True)
+                apps = []
+                for line in output.strip().splitlines():
+                    if "|" in line:
+                        name, app_id = line.split("|", 1)
+                        apps.append((name.strip(), app_id.strip()))
+                return apps
+            except subprocess.CalledProcessError as e:
+                print(f"[UWP Fetch Error] PowerShell returned error code {e.returncode}")
+                print(f"Output: {e.output}")
+                return []
+            except Exception as e:
+                print(f"[UWP Fetch Exception] {e}")
+                return []
+
+        def search_installed_apps(name_input):
+            name = name_input.lower()
+
+            # Search UWP apps
+            uwp_matches = [app for app in get_installed_uwp_apps() if name in app[0].lower()]
+            if uwp_matches:
+                print(f"[Match] Found UWP app: {uwp_matches[0][0]}")
+                return {"type": "uwp", "name": uwp_matches[0][0], "app_id": uwp_matches[0][1]}
+
+            # Search classic apps
+            classic_matches = [app for app in get_classic_installed_programs() if name in app[0].lower()]
+            if classic_matches:
+                install_location = classic_matches[0][1]
+                exe_path = find_executable_in_folder(install_location)
+                return {"type": "classic", "name": classic_matches[0][0], "path": exe_path or install_location}
+
+            return None
+
         search_btn = ctk.CTkButton(name_frame, text="🔍", width=40, command=search_installed_apps)
         search_btn.pack(side="left")
 
