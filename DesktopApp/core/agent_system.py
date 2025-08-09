@@ -28,7 +28,7 @@ load_dotenv()
 
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
 QWEN_API_KEY = os.getenv("QWEN_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_KEY")
 
 def run_agent_system(emotions):
     initial_state = AgentState(
@@ -796,46 +796,69 @@ def recommendation_agent(state):
                     }
             }
 
-        res = requests.post(
-             "https://d53cb0fd37cb.ngrok-free.app/api/generate",  # Use local endpoint
-            headers={"Content-Type": "application/json"},
-            json={
-                "model": "qwen3:4b",
-                "prompt": prompt,
-                "stream": False,
-                "options": {"temperature": 0.2},
-                "format": schema    
-            }
+        # res = requests.post(
+        #      "https://d53cb0fd37cb.ngrok-free.app/api/generate",  # Use local endpoint
+        #     headers={"Content-Type": "application/json"},
+        #     json={
+        #         "model": "qwen3:4b",
+        #         "prompt": prompt,
+        #         "stream": False,
+        #         "options": {"temperature": 0.2},
+        #         "format": schema    
+        #     }
+        # )
+
+
+        # print("[Agent] API response:", res.json())
+        # if res.status_code != 200:
+        #     print(f"[Agent] API returned status {res.status_code}: {res.text[:200]}")
+        #     return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        # # raw_content = res.json()["choices"][0]["message"]["content"]
+        # raw_content = res.json()["response"]
+        # print("Raw Response Content:", raw_content)
+
+        # try:
+        #     parsed_data = json.loads(raw_content) if isinstance(raw_content, str) else raw_content
+        # except json.JSONDecodeError:
+        #     print("[Agent] Failed to decode JSON.")
+        #     return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        # if "listofRecommendations" not in parsed_data or not isinstance(parsed_data["listofRecommendations"], list):
+        #     print("[Agent] Parsed data is not a valid list of dicts.")
+        #     return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        # try:
+        #     recommendation_objects = [RecommendationResponse(**item) for item in parsed_data["listofRecommendations"]]
+        #     app_state.recommendations = parsed_data["listofRecommendations"]
+        # except Exception as e:
+        #     print("[Agent] Exception parsing recommendation objects:", e)
+        #     return {"recommendation": ["No action needed"], "recommendation_options": []}
+
+        # resp_data = RecommendationList(listofRecommendations=recommendation_objects)
+
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        
+        response = client.responses.parse(
+            model="gpt-4o-2024-08-06",
+            input=[
+                {"role": "system", "content": "Give the proper structured output."},
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            text_format=RecommendationList,
         )
 
+        print("[Agent] API response:", response.output_parsed)
 
-        print("[Agent] API response:", res.json())
-        if res.status_code != 200:
-            print(f"[Agent] API returned status {res.status_code}: {res.text[:200]}")
-            return {"recommendation": ["No action needed"], "recommendation_options": []}
+        resp_data = response.output_parsed
 
-        # raw_content = res.json()["choices"][0]["message"]["content"]
-        raw_content = res.json()["response"]
-        print("Raw Response Content:", raw_content)
+        listData = convert_recommendations(resp_data)
+        print("List data: ", listData)
 
-        try:
-            parsed_data = json.loads(raw_content) if isinstance(raw_content, str) else raw_content
-        except json.JSONDecodeError:
-            print("[Agent] Failed to decode JSON.")
-            return {"recommendation": ["No action needed"], "recommendation_options": []}
-
-        if "listofRecommendations" not in parsed_data or not isinstance(parsed_data["listofRecommendations"], list):
-            print("[Agent] Parsed data is not a valid list of dicts.")
-            return {"recommendation": ["No action needed"], "recommendation_options": []}
-
-        try:
-            recommendation_objects = [RecommendationResponse(**item) for item in parsed_data["listofRecommendations"]]
-            app_state.recommendations = parsed_data["listofRecommendations"]
-        except Exception as e:
-            print("[Agent] Exception parsing recommendation objects:", e)
-            return {"recommendation": ["No action needed"], "recommendation_options": []}
-
-        resp_data = RecommendationList(listofRecommendations=recommendation_objects)
+        app_state.recommendations = listData
 
         # Extract recommendations
         recommendations_list = [rec.recommendation for rec in resp_data.listofRecommendations]
@@ -905,6 +928,7 @@ def task_execution_agent(state):
 
         selectedRecommendation = pickle_load().selectedRecommendation
         selectedApp = pickle_load().selectedApp
+        selectedSearchQuery = pickle_load().searchQuery
 
         chosen_recommendation = {}
 
@@ -913,6 +937,7 @@ def task_execution_agent(state):
                 for j in i['recommendation_options']:
                     if(j['app_name'] == selectedApp):
                         chosen_recommendation = j
+                        chosen_recommendation['search_query'] = selectedSearchQuery
                         break
                 break
 
@@ -1088,3 +1113,27 @@ def task_detection_agent(state):
     except Exception as e:
         print(f"Error detecting task: {str(e)}")
         return {"detected_task": "unknown"}
+    
+def convert_recommendations(recommendations: RecommendationList):
+    converted = []
+    for rec in recommendations.listofRecommendations:
+        rec_dict = {
+            "recommendation": normalize_str(rec.recommendation),
+            "recommendation_options": []
+        }
+        for app in rec.recommendation_options:
+            rec_dict["recommendation_options"].append({
+                "app_name": normalize_str(app.app_name),
+                "app_url": normalize_str(app.app_url),
+                "search_query": normalize_str(app.search_query),
+                "isLocal": bool(app.is_local)
+            })
+        converted.append(rec_dict)
+    return converted
+
+def normalize_str(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return " ".join(map(str, value))
+    return str(value)

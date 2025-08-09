@@ -9,6 +9,7 @@ class AppState:
         self.selectedApp = ""
         self.selectedRecommendation = ""
         self.averageEmotion = ""
+        self.searchQuery = ""
 
     def reset(self):
         self.__init__() 

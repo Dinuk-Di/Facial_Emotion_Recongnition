@@ -272,10 +272,12 @@ def set_executed_state():
     executed = data.get('executed')
     recommendation = data.get('recommendation')
     recommendedApp = data.get('recommendedApp')
+    searchQuery = data.get('searchQuery')
     if executed is not None:
         app_state.executedApp = executed
         app_state.selectedApp = recommendedApp
         app_state.selectedRecommendation = recommendation
+        app_state.searchQuery = searchQuery
         pickle_save()
         return jsonify({"message": "Execution state updated successfully"}), 200
     return jsonify({"error": "Invalid data"}), 400
