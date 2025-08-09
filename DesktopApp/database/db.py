@@ -173,8 +173,28 @@ def add_app_data(conn, user_id, category, app_name, app_id, app_url, path, is_lo
 # get app_type, app_name and app_id only
 def get_app_data(conn, app_name):
     cursor = conn.cursor()
-    cursor.execute("SELECT app_type, app_name, app_id, path FROM apps WHERE app_name = ?", (app_name,))
-    return cursor.fetchone()
+    cursor.execute("""
+        SELECT app_type, app_name, app_id, path
+        FROM apps
+        WHERE app_name = ? AND is_local = 1
+    """, (app_name,))
+    row = cursor.fetchone()
+
+    if row:
+        return {
+            "app_type": row[0],
+            "name": row[1],
+            "app_id": row[2],
+            "path": row[3]
+        }
+    else:
+        return {
+            "app_type": "Unknown",
+            "name": app_name,
+            "app_id": None,
+            "path": None
+        }
+
 
 def delete_app_data(conn, app_id: int):
     """
@@ -212,23 +232,23 @@ def add_initial_apps(conn):
     Adds initial apps to the database.
     """
     initial_apps = [
-        (1, 'Games', 'Subway Surfers', None, 'https://poki.com/en/g/subway-surfers',None, False,'web'),
-        (1, 'Games', 'Brain Test', None, 'https://poki.com/en/g/brain-test-tricky-puzzles', None,False,'web'),
-        (1, 'Games', 'Bike Game', None, 'https://poki.com/en/g/stunt-bike-extreme',None, False,'web'),
-        (1,'Entertainment', 'YouTube', None, 'https://www.youtube.com', None,False,'web'),
-        (1,'Entertainment', 'Films', None, 'https://myflixerz.to/', None,False,'web'),
-        (1,'Songs', 'Spotify', None, 'https://open.spotify.com/', None,False,'web'),
-        (1,'Songs', 'SoundCloud', None, 'https://soundcloud.com/', None,False,'web'),
-        (1,'SocialMedia','WhatsApp',None,'https://web.whatsapp.com/',None, False,'web'),
-        (1,'SocialMedia','Facebook',None,'https://www.facebook.com/',None, False,'web'),
-        (1,'Help','ChatGPT',None,'https://chatgpt.com/',None,False,'web'),
-        (1,'Help','Perplexity',None,'https://www.perplexity.ai/',None,False,'web')
+        (1, 'Games', 'Subway Surfers', None, 'https://poki.com/en/g/subway-surfers', None, False, 'web'),
+        (1, 'Games', 'Brain Test', None, 'https://poki.com/en/g/brain-test-tricky-puzzles', None, False, 'web'),
+        (1, 'Games', 'Bike Game', None, 'https://poki.com/en/g/stunt-bike-extreme', None, False, 'web'),
+        (1, 'Entertainment', 'YouTube', None, 'https://www.youtube.com', None, False, 'web'),
+        (1, 'Entertainment', 'Films', None, 'https://myflixerz.to/', None, False, 'web'),
+        (1, 'Songs', 'Spotify', None, 'https://open.spotify.com/', None, False, 'web'),
+        (1, 'Songs', 'SoundCloud', None, 'https://soundcloud.com/', None, False, 'web'),
+        (1, 'SocialMedia', 'WhatsApp', None, 'https://web.whatsapp.com/', None, False, 'web'),
+        (1, 'SocialMedia', 'Facebook', None, 'https://www.facebook.com/', None, False, 'web'),
+        (1, 'Help', 'ChatGPT', None, 'https://chatgpt.com/', None, False, 'web'),
+        (1, 'Help', 'Perplexity', None, 'https://www.perplexity.ai/', None, False, 'web')
 
     ]
 
     cursor = conn.cursor()
     cursor.executemany("""
-        INSERT INTO apps (user_id, category, app_name, app_url, app_id, path, is_local, app_type)
+        INSERT INTO apps (user_id, category, app_name, app_id, app_url, path, is_local, app_type)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, initial_apps)
     conn.commit()
@@ -241,6 +261,7 @@ def get_apps(conn) -> List[Tuple]:
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM apps ORDER BY id DESC LIMIT 10")
     all_data = cursor.fetchall()
+    print("[App Data]:", all_data)
     # get name, category and path only
-    filtered_data = [(row[2], row[3], row[5]) for row in all_data]
+    filtered_data = [(row[2], row[3], row[4], row[6]) for row in all_data]
     return filtered_data

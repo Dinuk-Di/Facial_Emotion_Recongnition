@@ -261,7 +261,7 @@ class AppController:
                     self.agent_mode = True
                     threading.Thread(target=self.run_agent_workflow, daemon=True).start()
 
-                time.sleep(0.2)
+                time.sleep(5)
         finally:
             self.reader_thread.stop()
             self.log("[INFO] AppController stopped.")

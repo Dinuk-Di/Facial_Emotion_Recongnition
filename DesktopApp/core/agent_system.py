@@ -292,7 +292,7 @@ def recommendation_agent(state):
 
             Context:
             - User feels: "{emotion}"
-            - Available installed apps (format: category | name | path):
+            - Available installed apps (format: category | name | app_id | path):
             {available_apps!r}
 
             Goal:
@@ -300,7 +300,7 @@ def recommendation_agent(state):
             - recommendation: A phrase of exactly FOUR words.
             - recommendation_options: An array of EXACTLY 2 options per recommendation. Each option must include:
                 - app_name: (string)
-                - app_url: (either a valid HTTPS URL for web apps OR local file path for installed apps)
+                - app_url: (either a valid HTTPS URL for web apps OR local file path or app_id for installed apps)
                 - search_query: (string, required only for web apps)
                 - is_local: (true if app is installed locally, false if web)
 

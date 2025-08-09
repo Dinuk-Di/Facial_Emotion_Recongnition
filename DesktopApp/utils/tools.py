@@ -84,7 +84,7 @@ def get_newest_parent_pid_by_app_name(app_name):
             name = (proc.info['name'] or "").lower()
             exe = (proc.info['exe'] or "").lower()
 
-            if app_name in name or app_name in exe:
+            if app_name in name.lower() or app_name in exe.lower():
                 parent = proc.parent()
                 # Only include if no parent or parent's name/exe doesn't match
                 if not parent or (
@@ -241,12 +241,9 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
     is_local = chosen_recommendation.get("is_local", False)
     conn = get_connection()
 
-    app_data = get_app_data(conn, app_name)
-    print("This is app data",app_data)
-    if app_data:
-        app_type, app_name, app_id, path = app_data
-    else:
-        app_type, app_name, app_id,path = "Unknown", "Unknown App", "Unknown ID",""
+    print("Chosen Recommendation:", chosen_recommendation)
+    app_info = get_app_data(conn, app_name.lower())
+    print("[App Data]:", app_info)
 
     def send_reminder_notification():
         """Send reminder notification before closing"""
@@ -397,17 +394,12 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
 
     # 1) Local app path
     if is_local:
-
         try:
-            unified_app_launcher(app_data)
-            print(f"[Launch] {app_name} from {app_url}")
-            # proc = subprocess.Popen([app_url])
-            # pid = None
-            # launched_pid = proc.pid
-            # print(f"[Local App] Launched {app_name} with PID: {launched_pid}")
-            
-            print(f"[Admin Launch] Launched: {app_url}")
+            unified_app_launcher(app_info)
+            print(f"[Admin Launch] Launched")
+            print(f"[Local App] Launched {app_name}")
             found_pid = get_newest_parent_pid_by_app_name(app_name)
+            print(f"[Local App] Found PID: {found_pid} for app '{app_name}'")
             if not found_pid:
                 print(f"[Local App] No matching PID found for {app_name}")
                 return False, None, None
