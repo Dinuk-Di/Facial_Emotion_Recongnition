@@ -24,6 +24,7 @@ import ctypes
 from openai import OpenAI
 import win32gui
 from old_utils.state import app_state, pickle_save, pickle_load
+import winsound
 
 load_dotenv()
 
@@ -198,6 +199,7 @@ def show_notification_with_ok(title, message):
     """Show Windows message box with OK/Cancel buttons"""
     MB_OKCANCEL = 0x01
     IDOK = 1
+    winsound.MessageBeep()
     result = ctypes.windll.user32.MessageBoxW(0, message, title, MB_OKCANCEL)
     return result == IDOK
 

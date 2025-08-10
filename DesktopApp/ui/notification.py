@@ -14,6 +14,7 @@ executer_path = r'executer.pyw'
 import tkinter as tk
 import os
 import ctypes
+import winsound
 
 # def send_notification(title, recommendations, timeout=None):
 #     user_choice = {"value": None}
@@ -62,6 +63,7 @@ import ctypes
 import tkinter as tk
 
 def send_notification(title, recommended_output, recommended_options, timeout=None):
+    winsound.MessageBeep()
     selected_app = {"value": None}
 
     def show_app_options(app_options):

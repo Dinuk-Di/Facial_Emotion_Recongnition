@@ -259,6 +259,7 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
                 icon=icon_path
             )
             toast.add_actions(label="Got it")
+            toast.set_audio(audio.Mail, loop=True)
             toast.show()
             print("[Notification] Sent reminder")
         except Exception as e:
@@ -456,6 +457,7 @@ def open_recommendations(chosen_recommendation: dict) -> tuple:
                     msg=f"Opened in default browser. Close manually when done.",
                     duration="long"
                 )
+                toast.set_audio(audio.Mail, loop=True)
                 toast.show()
             except Exception:
                 pass
