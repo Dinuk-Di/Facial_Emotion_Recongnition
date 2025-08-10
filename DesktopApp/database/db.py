@@ -23,6 +23,7 @@ def data_initialization():
     conn = sqlite3.connect(DB_PATH)
     add_emotions(conn)
     add_initial_apps(conn)
+    initial_settings()
     return conn
 
 def get_connection():
@@ -71,6 +72,34 @@ def app_settings(conn):
     """
     conn.execute(query)
     conn.commit()
+
+#convert the value to integer
+def get_app_setting(setting_name, default_value):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT setting_value FROM app_settings WHERE setting_name = ?", (setting_name,))
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        try:
+            return int(result[0])
+        except ValueError:
+            return default_value
+    return default_value
+
+def initial_settings():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "theme", "light"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "systemDisable", "0"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "recommendationTime", "30"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "resetTime", "50"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "appExecuteTime", "60"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "soundLevel", "2"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "focusDetection", "0"))
+    cursor.execute("INSERT INTO app_settings (user_id, setting_name, setting_value) VALUES (?, ?, ?)", (1, "handDetection", "0"))
+    conn.commit()
+    conn.close()
 
 def agent_recommendations(conn):
     query = """

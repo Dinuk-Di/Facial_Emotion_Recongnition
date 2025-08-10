@@ -17,6 +17,8 @@ from core.emotion_detector import get_emotion
 from core.sleepy_detector import check_sleepy
 from core.hand_movement import detect_hand
 from core.agent_system import run_agent_system
+from core.voice_assistant import VoiceAssistant
+from database.db import get_connection, get_app_setting
 
 
 class FrameReader(threading.Thread):
@@ -57,9 +59,10 @@ class AppController:
         self.running = False
         self.reader_thread = FrameReader(self.frame_queue)
         self.main_thread = None
-        self.focus_time = 25
-        self.notify_time = 30
-
+        self.focus_time = get_app_setting("resetTime", 25)
+        self.notify_time = get_app_setting("recommendationTime", 30)
+        self.need_focus_mode = get_app_setting("focusDetection",1)
+        self.need_hand_mode = get_app_setting("handDetection",1)
         self.last_seen = time.time()
         self.eye_closed_since = None
         self.alert_triggered = False
@@ -67,7 +70,7 @@ class AppController:
         self.agent_mode = False
         self.sleepy_pause_until = 0
 
-        self.data_buffer = deque(maxlen=120)
+        self.data_buffer = deque(maxlen=120)    
         self.emotion_log = []
         self.hand_log = []
         self.lock = threading.Lock()
@@ -77,6 +80,9 @@ class AppController:
         self.window_start_time = time.time()
         self.emotion_counter = Counter()
         self.hand_counter = Counter()
+        
+        # self.voice_assistant = VoiceAssistant(self)
+        # self.voice_assistant.start()
 
     def log(self, message):
         if self.log_queue:
@@ -191,25 +197,26 @@ class AppController:
                     continue
 
                 self.last_seen = current_time
+                print("Need Focus Mode", self.need_focus_mode)
+                if self.need_focus_mode == 1:
+                    def sleepy_check():
+                        try:
+                            eye_closed = check_sleepy(frame)
+                            self.log(f"[Sleepy] Eye closed: {eye_closed}")
+                            if eye_closed:
+                                if self.eye_closed_since is None:
+                                    self.eye_closed_since = current_time
+                                elif (current_time - self.eye_closed_since >= self.focus_time) and not self.alert_triggered:
+                                    self.alert_triggered = True
+                                    self.buzzer_and_notify()
+                            else:
+                                self.eye_closed_since = None
+                                self.alert_triggered = False
+                        except Exception as e:
+                            self.log(f"[ERROR] Sleepy detection: {e}")
+                            traceback.print_exc()
 
-                def sleepy_check():
-                    try:
-                        eye_closed = check_sleepy(frame)
-                        self.log(f"[Sleepy] Eye closed: {eye_closed}")
-                        if eye_closed:
-                            if self.eye_closed_since is None:
-                                self.eye_closed_since = current_time
-                            elif (current_time - self.eye_closed_since >= self.focus_time) and not self.alert_triggered:
-                                self.alert_triggered = True
-                                self.buzzer_and_notify()
-                        else:
-                            self.eye_closed_since = None
-                            self.alert_triggered = False
-                    except Exception as e:
-                        self.log(f"[ERROR] Sleepy detection: {e}")
-                        traceback.print_exc()
-
-                threading.Thread(target=sleepy_check).start()
+                    threading.Thread(target=sleepy_check).start()
 
                 # 👇 Skip if currently in sleepy pause
                 if time.time() < self.sleepy_pause_until:
@@ -226,6 +233,28 @@ class AppController:
 
                 emotion_result, hand_result = [], []
 
+                # def detect_emotion():
+                #     try:
+                #         with self.gpu_lock:
+                #             emotion_result.extend(get_emotion(frame))
+                #     except Exception as e:
+                #         self.log(f"[ERROR] Emotion: {e}")
+                # t1 = threading.Thread(target=detect_emotion)
+
+                # def detect_hand_thread():
+                #     try:
+                #         hand_result.extend(detect_hand(frame))
+                #     except Exception as e:
+                #         self.log(f"[ERROR] Hand: {e}")
+
+                # t1 = threading.Thread(target=detect_emotion)
+                # t2 = threading.Thread(target=detect_hand_thread)
+                # t1.start()
+                # t2.start()
+                # t1.join()
+                # t2.join()
+                emotion_result, hand_result = [], []
+                print("Need Hand Mode", self.need_hand_mode)
                 def detect_emotion():
                     try:
                         with self.gpu_lock:
@@ -233,18 +262,22 @@ class AppController:
                     except Exception as e:
                         self.log(f"[ERROR] Emotion: {e}")
 
-                def detect_hand_thread():
-                    try:
-                        hand_result.extend(detect_hand(frame))
-                    except Exception as e:
-                        self.log(f"[ERROR] Hand: {e}")
+                threads = [threading.Thread(target=detect_emotion)]
 
-                t1 = threading.Thread(target=detect_emotion)
-                t2 = threading.Thread(target=detect_hand_thread)
-                t1.start()
-                t2.start()
-                t1.join()
-                t2.join()
+                if self.need_hand_mode == 1:
+                    def detect_hand_thread():
+                        try:
+                            hand_result.extend(detect_hand(frame))
+                        except Exception as e:
+                            self.log(f"[ERROR] Hand: {e}")
+                    threads.append(threading.Thread(target=detect_hand_thread))
+
+                # Run whichever threads we have
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join()
+
 
                 if emotion_result:
                     self.log(f"[Emotion Detection] Detected: {emotion_result}")
